@@ -1,0 +1,163 @@
+# Default / production-oriented values for juiceshop-chatbot
+# Keep resource names as juiceshop-chatbot-* while Chart.name is owasp-juiceshop-chatbot
+nameOverride: juiceshop-chatbot
+fullnameOverride: ""
+
+# Global toggles
+fullname:
+  create: false
+  name: juiceshop-chatbot
+
+fullnameLabels: {}
+commonAnnotations: {}
+
+imagePullSecrets: []
+imagePullPolicy: IfNotPresent
+
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: owasp-juiceshop-chatbot-frontend
+    tag: "local"
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+  probes:
+    startup:
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      periodSeconds: 10
+    liveness:
+      periodSeconds: 20
+  podAntiAffinity: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 0
+    fsGroup: 0
+
+backend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: owasp-juiceshop-chatbot-backend
+    tag: "local"
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  openai:
+    model: gpt-4o-mini
+    embeddingModel: text-embedding-3-small
+    # Prefer existingSecret in real environments; value below is a placeholder only.
+    apiKey: ""
+    existingSecret: ""
+    existingSecretKey: OPEN_AI_KEY
+  rag:
+    topK: 5
+    collection: juice_shop_products
+    productsConfigPath: /data/config/default.yml
+    ingestOnStartup: true
+    ingestReset: false
+    chromaWaitTimeoutSeconds: 180
+    assistantName: Juice Shop Product Assistant
+  probes:
+    startup:
+      failureThreshold: 36
+      periodSeconds: 5
+    readiness:
+      periodSeconds: 10
+    liveness:
+      periodSeconds: 20
+  podAntiAffinity: true
+  waitForChroma:
+    enabled: true
+    image: curlimages/curl:8.11.1
+  observability:
+    logLevel: INFO
+    logJson: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+
+chromadb:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-chromadb
+    tag: "local"
+  service:
+    type: ClusterIP
+    port: 8000
+  persistence:
+    enabled: true
+    storageClassName: juiceshop-chatbot-chromadb
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+    # When true, also create a hostPath PersistentVolume (KIND / local).
+    createHostPathPV: false
+    hostPath: /mnt/data/juiceshop-chatbot-chromadb
+  env:
+    IS_PERSISTENT: "TRUE"
+    ANONYMIZED_TELEMETRY: "FALSE"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  probes:
+    startup:
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      periodSeconds: 10
+    liveness:
+      periodSeconds: 20
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: juiceshop-chatbot.local
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+  backendPath: /ai-assistant(/|$)(.*)
+  backendRewriteTarget: /$2
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+networkPolicy:
+  enabled: true
+  ingressNamespace: ingress-nginx

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: juiceshop-chatbot-chromadb-pvc
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot-chromadb
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: juiceshop-chatbot-chromadb
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: juiceshop-chatbot-chromadb-pv

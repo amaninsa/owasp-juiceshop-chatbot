@@ -1,0 +1,151 @@
+/*!
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * SPDX-License-Identifier: MIT
+ */
+
+@use '../../styles/variables' as *;
+
+.ai-widget {
+  bottom: $space-l;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: $space-s;
+  position: fixed;
+  right: $space-l;
+  z-index: 1000;
+}
+
+.ai-fab {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.ai-panel {
+  background: var(--theme-background, #fff);
+  border: 1px solid var(--theme-primary-fade-20, rgba(0, 0, 0, 0.12));
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  height: min(520px, calc(100vh - 140px));
+  overflow: hidden;
+  width: min(360px, calc(100vw - 32px));
+}
+
+.ai-panel__header {
+  align-items: center;
+  background: var(--theme-primary, #546e7a);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  padding: $space-s $space-s $space-s $space-m;
+}
+
+.ai-panel__title {
+  align-items: center;
+  display: flex;
+  gap: $space-s;
+
+  mat-icon {
+    font-size: 28px;
+    height: 28px;
+    width: 28px;
+  }
+
+  strong {
+    display: block;
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  span {
+    display: block;
+    font-size: 12px;
+    opacity: 0.9;
+  }
+}
+
+.ai-panel__messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-s;
+  overflow-y: auto;
+  padding: $space-m;
+}
+
+.ai-bubble {
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 85%;
+  padding: $space-s $space-m;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-bubble--assistant {
+  align-self: flex-start;
+  background: var(--theme-primary-fade-10, rgba(84, 110, 122, 0.12));
+}
+
+.ai-bubble--user {
+  align-self: flex-end;
+  background: var(--theme-primary, #546e7a);
+  color: #fff;
+}
+
+.ai-bubble--loading {
+  align-items: center;
+  display: inline-flex;
+  gap: $space-xs;
+}
+
+.ai-error {
+  background: rgba(198, 40, 40, 0.1);
+  border-radius: 10px;
+  color: #c62828;
+  font-size: 13px;
+  padding: $space-s;
+}
+
+.ai-panel__composer {
+  align-items: flex-end;
+  border-top: 1px solid var(--theme-primary-fade-20, rgba(0, 0, 0, 0.12));
+  display: flex;
+  gap: $space-s;
+  padding: $space-s;
+
+  textarea {
+    background: transparent;
+    border: 1px solid var(--theme-primary-fade-30, rgba(0, 0, 0, 0.18));
+    border-radius: 12px;
+    color: inherit;
+    flex: 1;
+    font: inherit;
+    max-height: 96px;
+    min-height: 44px;
+    padding: $space-s;
+    resize: none;
+
+    &:focus {
+      border-color: var(--theme-primary, #546e7a);
+      outline: none;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .ai-widget {
+    bottom: $space-m;
+    right: $space-m;
+  }
+
+  .ai-panel {
+    height: min(70vh, calc(100vh - 120px));
+  }
+}

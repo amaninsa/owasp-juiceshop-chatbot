@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "OWASP Juice Shop + RAG AI Assistant stack"

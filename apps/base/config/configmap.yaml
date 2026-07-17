@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: juiceshop-chatbot-config
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: config
+data:
+  # Backend (FastAPI)
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  CHROMA_HOST: "juiceshop-chatbot-chromadb"
+  CHROMA_PORT: "8000"
+  CHROMA_COLLECTION: "juice_shop_products"
+  PRODUCTS_CONFIG_PATH: "/data/config/default.yml"
+  OPENAI_MODEL: "gpt-4o-mini"
+  OPENAI_EMBEDDING_MODEL: "text-embedding-3-small"
+  RAG_TOP_K: "5"
+  INGEST_ON_STARTUP: "true"
+  INGEST_RESET: "false"
+  CHROMA_WAIT_TIMEOUT_SECONDS: "180"
+  ASSISTANT_NAME: "Juice Shop Product Assistant"
+  LOG_LEVEL: "INFO"
+  LOG_JSON: "true"
+
+  # Frontend (Juice Shop)
+  NODE_ENV: "production"
+  PORT: "3000"
+
+  # ChromaDB
+  IS_PERSISTENT: "TRUE"
+  ANONYMIZED_TELEMETRY: "FALSE"

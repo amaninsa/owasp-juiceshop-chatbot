@@ -5,5 +5,7 @@
 
 export const environment = {
   production: true,
-  hostServer: '.'
+  hostServer: '.',
+  // Same-origin path via nginx gateway in docker-compose
+  aiAssistantUrl: '/ai-assistant'
 }

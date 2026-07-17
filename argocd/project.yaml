@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: juiceshop-chatbot
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: OWASP Juice Shop AI Assistant (frontend, backend, ChromaDB)
+  sourceRepos:
+    # Replace with your real Git remote; "*" allowed for local bootstrap only.
+    - "*"
+  destinations:
+    - namespace: juiceshop-chatbot
+      server: https://kubernetes.default.svc
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: ""
+      kind: PersistentVolume
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: networking.k8s.io
+      kind: IngressClass
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true

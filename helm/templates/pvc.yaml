@@ -1,0 +1,47 @@
+{{- if and .Values.chromadb.enabled .Values.chromadb.persistence.enabled }}
+{{- if .Values.chromadb.persistence.createHostPathPV }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "juiceshop-chatbot.chromadb.fullname" . }}-pv
+  labels:
+    {{- include "juiceshop-chatbot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  capacity:
+    storage: {{ .Values.chromadb.persistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    {{- toYaml .Values.chromadb.persistence.accessModes | nindent 4 }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.chromadb.persistence.storageClassName | quote }}
+  hostPath:
+    path: {{ .Values.chromadb.persistence.hostPath | quote }}
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: Exists
+---
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "juiceshop-chatbot.chromadb.fullname" . }}-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "juiceshop-chatbot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    {{- toYaml .Values.chromadb.persistence.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.chromadb.persistence.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.chromadb.persistence.size }}
+  {{- if .Values.chromadb.persistence.createHostPathPV }}
+  volumeName: {{ include "juiceshop-chatbot.chromadb.fullname" . }}-pv
+  {{- end }}
+{{- end }}

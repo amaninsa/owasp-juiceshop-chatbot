@@ -1,0 +1,46 @@
+# Ephemeral CI overlay (KIND in GitHub Actions)
+# Uses local image tags; PVC uses the default StorageClass (no hostPath PV).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: juiceshop-chatbot
+
+resources:
+  - ../../base
+
+images:
+  - name: owasp-juiceshop-chatbot-chromadb
+    newName: owasp-juiceshop-chatbot-chromadb
+    newTag: local
+  - name: owasp-juiceshop-chatbot-backend
+    newName: owasp-juiceshop-chatbot-backend
+    newTag: local
+  - name: owasp-juiceshop-chatbot-frontend
+    newName: owasp-juiceshop-chatbot-frontend
+    newTag: local
+
+replicas:
+  - name: juiceshop-chatbot-frontend
+    count: 1
+  - name: juiceshop-chatbot-backend
+    count: 1
+  - name: juiceshop-chatbot-chromadb
+    count: 1
+
+patches:
+  - path: patches/ingress-host.yaml
+  - path: patches/configmap-ci.yaml
+  - path: patches/resources-ci.yaml
+  - path: patches/remove-networkpolicies.yaml
+  - target:
+      kind: PersistentVolumeClaim
+      name: juiceshop-chatbot-chromadb-pvc
+    patch: |-
+      - op: remove
+        path: /spec/volumeName
+      - op: replace
+        path: /spec/storageClassName
+        value: standard
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi

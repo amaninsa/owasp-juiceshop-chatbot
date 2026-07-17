@@ -1,0 +1,168 @@
+# Default deny all ingress/egress in the Juice Shop AI namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-default-deny
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow DNS to kube-dns / CoreDNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-allow-dns
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Ingress controller → frontend (:3000) and backend (:8000)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-allow-ingress-nginx
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: ["frontend", "backend"]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8000
+---
+# Backend → ChromaDB + OpenAI (HTTPS) + optional same-namespace metrics/health
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-allow-backend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: juiceshop-chatbot
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: vector-db
+      ports:
+        - protocol: TCP
+          port: 8000
+    # OpenAI / external HTTPS APIs
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# ChromaDB: only backend may connect
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-allow-chromadb
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: vector-db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress: []
+---
+# Frontend: ingress only (static UI); no cluster-east-west needed
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: juiceshop-chatbot-allow-frontend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: juiceshop-chatbot
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress: []

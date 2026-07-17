@@ -1,20 +1,51 @@
+# Git / IDE / local tooling
 .git/
-monitoring/
-node_modules/
-screenshots/
-test/
-build/reports/
-dist/
-vagrant/
-logs/
-Dockerfile
-.npmrc
-/bom.json
-/bom.xml
-.nyc_output
-coverage
+.github/
+.claude/
+.codeium/
+.continue/
+.cursor/
+.junie/
+.idea/
+.vscode/
+.colima/
+*.md
+!README.md
 
-# Pattern is *not covered* by node_modules/ above no matter what IntelliJ says!
+# Dependencies & build artifacts
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+**/__pycache__/
+**/*.pyc
+ai-assistant/.venv/
+backend/.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+coverage/
+.nyc_output/
+dist/
+build/reports/
+logs/
+*.log
+
+# Tests / docs / ops (not needed inside app image)
+test/
+screenshots/
+vagrant/
+monitoring/
+ftp/legal.md
+.npmrc
+/bom.json
+/bom.xml
+
+# Secrets must never enter the image (runtime env_file / K8s Secret only)
+.env
+.env.*
+!.env.example
+
+# Nested compose / local docker state
+**/docker-compose*.yml
+Dockerfile

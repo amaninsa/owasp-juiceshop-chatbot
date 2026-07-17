@@ -1,0 +1,44 @@
+# ArgoCD Application — local KIND overlay
+# Prerequisite: create secret juiceshop-chatbot-secrets in namespace juiceshop-chatbot
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: juiceshop-chatbot-local
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    environment: local
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: juiceshop-chatbot
+  source:
+    # TODO: set to your Git repository URL
+    repoURL: https://github.com/amaninsa/owasp-juiceshop-chatbot.git
+    targetRevision: HEAD
+    path: apps/overlays/local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: juiceshop-chatbot
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  revisionHistoryLimit: 10

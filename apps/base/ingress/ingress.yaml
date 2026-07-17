@@ -1,0 +1,63 @@
+# Path-based routing mirroring docker-compose nginx gateway:
+#   /ai-assistant/* -> FastAPI backend
+#   /*              -> Juice Shop frontend
+# Requires an Ingress Controller (e.g. ingress-nginx).
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: juiceshop-chatbot-backend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: juiceshop-chatbot.local
+      http:
+        paths:
+          - path: /ai-assistant(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: juiceshop-chatbot-backend
+                port:
+                  number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: juiceshop-chatbot-frontend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    # WebSockets work with default nginx ingress behaviour; avoid configuration-snippet
+    # (often disabled by admission webhook in modern ingress-nginx).
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: juiceshop-chatbot.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: juiceshop-chatbot-frontend
+                port:
+                  number: 3000

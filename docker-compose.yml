@@ -1,0 +1,104 @@
+services:
+  chromadb:
+    build:
+      context: .
+      dockerfile: chromadb/Dockerfile
+    image: owasp-juiceshop-chatbot-chromadb:local
+    container_name: owasp-juiceshop-chatbot-chromadb
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    ports:
+      - "${CHROMA_PUBLISH_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/heartbeat', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        VERSION: "1.1.0"
+    image: owasp-juiceshop-chatbot-backend:local
+    container_name: owasp-juiceshop-chatbot-backend
+    env_file:
+      - .env.openai
+    environment:
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      PRODUCTS_CONFIG_PATH: /data/config/default.yml
+      API_HOST: "0.0.0.0"
+      API_PORT: "${AI_ASSISTANT_PORT:-8000}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      OPENAI_EMBEDDING_MODEL: "${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}"
+      INGEST_ON_STARTUP: "${INGEST_ON_STARTUP:-true}"
+      INGEST_RESET: "${INGEST_RESET:-true}"
+      CHROMA_WAIT_TIMEOUT_SECONDS: "${CHROMA_WAIT_TIMEOUT_SECONDS:-120}"
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    ports:
+      - "${AI_ASSISTANT_PUBLISH_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/livez"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+  juice-shop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: owasp-juiceshop-chatbot-frontend:local
+    container_name: owasp-juiceshop-chatbot-frontend
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.gateway
+    image: owasp-juiceshop-chatbot-gateway:local
+    container_name: owasp-juiceshop-chatbot-gateway
+    ports:
+      - "${GATEWAY_PUBLISH_PORT:-3000}:80"
+    depends_on:
+      juice-shop:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  chroma_data:

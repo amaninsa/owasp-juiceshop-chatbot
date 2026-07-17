@@ -1,0 +1,29 @@
+# Static PV for local / KIND clusters without a preferred dynamic StorageClass.
+# On cloud providers, prefer deleting this PV and using a cloud StorageClass on the PVC instead.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: juiceshop-chatbot-chromadb-pv
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot-chromadb
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: storage
+  annotations:
+    volume.kubernetes.io/local-path-enabled: "true"
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: juiceshop-chatbot-chromadb
+  hostPath:
+    path: /mnt/data/juiceshop-chatbot-chromadb
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: Exists

@@ -1,0 +1,70 @@
+<!--
+  ~ Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
+  ~ SPDX-License-Identifier: MIT
+  -->
+
+<div class="ai-widget">
+  @if (open) {
+    <div class="ai-panel" role="dialog" aria-label="Product AI assistant">
+      <header class="ai-panel__header">
+        <div class="ai-panel__title">
+          <mat-icon>smart_toy</mat-icon>
+          <div>
+            <strong>Product Assistant</strong>
+            <span>Ask about products &amp; pricing</span>
+          </div>
+        </div>
+        <button mat-icon-button type="button" aria-label="Close assistant" (click)="toggle()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <div class="ai-panel__messages" aria-live="polite">
+        @for (message of messages; track $index) {
+          <div class="ai-bubble" [class.ai-bubble--user]="message.role === 'user'" [class.ai-bubble--assistant]="message.role === 'assistant'">
+            {{ message.content }}
+          </div>
+        }
+        @if (loading) {
+          <div class="ai-bubble ai-bubble--assistant ai-bubble--loading">
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>Thinking…</span>
+          </div>
+        }
+        @if (error) {
+          <div class="ai-error">{{ error }}</div>
+        }
+        <div #messagesEnd></div>
+      </div>
+
+      <form class="ai-panel__composer" (ngSubmit)="send()">
+        <textarea
+          #messageInput
+          name="message"
+          rows="2"
+          [(ngModel)]="draft"
+          (keydown)="onKeydown($event)"
+          placeholder="e.g. How much is Apple Juice?"
+          [disabled]="loading"
+          aria-label="Message to product assistant"
+        ></textarea>
+        <button mat-mini-fab color="primary" type="submit" [disabled]="loading || !draft.trim()" aria-label="Send message">
+          <mat-icon>send</mat-icon>
+        </button>
+      </form>
+    </div>
+  }
+
+  <button
+    mat-fab
+    color="primary"
+    class="ai-fab"
+    type="button"
+    [matTooltip]="open ? 'Close assistant' : 'Ask about products'"
+    [attr.aria-expanded]="open"
+    aria-label="Open product AI assistant"
+    (click)="toggle()"
+  >
+    <mat-icon>{{ open ? 'close' : 'smart_toy' }}</mat-icon>
+  </button>
+</div>

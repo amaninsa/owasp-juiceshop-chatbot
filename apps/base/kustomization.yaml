@@ -1,0 +1,23 @@
+# GitOps base — canonical Kubernetes manifests for Juice Shop AI
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: juiceshop-chatbot
+
+resources:
+  - namespace.yaml
+  - config/configmap.yaml
+  - rbac/serviceaccounts.yaml
+  - rbac/rolebinding.yaml
+  - networkpolicy/policies.yaml
+  - chromadb/pvc.yaml
+  - chromadb/deployment.yaml
+  - chromadb/service.yaml
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - ingress/ingress.yaml
+
+commonAnnotations:
+  app.kubernetes.io/managed-by-gitops: "true"

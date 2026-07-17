@@ -1,0 +1,8 @@
+# Compatibility wrapper — delegates to GitOps local overlay.
+# Prefer: kubectl apply -k apps/overlays/local
+# Still supported: kubectl apply -k k8s/  AND  make deploy
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../apps/overlays/local

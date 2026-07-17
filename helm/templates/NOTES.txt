@@ -1,0 +1,46 @@
+CHART NAME: {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+APP VERSION: {{ .Chart.AppVersion }}
+
+Juice Shop AI has been deployed to namespace "{{ .Release.Namespace }}".
+
+Components
+----------
+{{- if .Values.frontend.enabled }}
+* Frontend : {{ include "juiceshop-chatbot.frontend.fullname" . }} ({{ .Values.frontend.replicaCount }} replicas)
+{{- end }}
+{{- if .Values.backend.enabled }}
+* Backend  : {{ include "juiceshop-chatbot.backend.fullname" . }} ({{ .Values.backend.replicaCount }} replicas)
+{{- end }}
+{{- if .Values.chromadb.enabled }}
+* ChromaDB : {{ include "juiceshop-chatbot.chromadb.fullname" . }}
+{{- end }}
+
+Access
+------
+{{- if .Values.ingress.enabled }}
+Ingress host: http://{{ .Values.ingress.host }}
+AI assistant: http://{{ .Values.ingress.host }}/ai-assistant/livez
+
+For KIND (hostPort 8080):
+  http://{{ .Values.ingress.host }}:8080
+{{- else }}
+Ingress is disabled. Use port-forward:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "juiceshop-chatbot.frontend.fullname" . }} 3000:{{ .Values.frontend.service.port }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "juiceshop-chatbot.backend.fullname" . }} 8000:{{ .Values.backend.service.port }}
+{{- end }}
+
+OpenAI secret
+-------------
+{{- if .Values.backend.openai.existingSecret }}
+Using existing secret: {{ .Values.backend.openai.existingSecret }} (key {{ .Values.backend.openai.existingSecretKey }})
+{{- else }}
+Secret created by this chart. Prefer --set backend.openai.apiKey=... or an existingSecret.
+{{- end }}
+
+Useful commands
+---------------
+  helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  kubectl -n {{ .Release.Namespace }} get pods,svc,ingress
+  helm upgrade {{ .Release.Name }} ./helm -n {{ .Release.Namespace }} -f ./helm/values-local.yaml

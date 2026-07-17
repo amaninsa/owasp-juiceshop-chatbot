@@ -1,5 +1,5 @@
 {
-  "name": "juice-shop",
+  "name": "owasp-juiceshop-chatbot",
   "version": "20.1.1",
   "private": true,
   "description": "Probably the most modern and sophisticated insecure web application",
@@ -19,18 +19,18 @@
     "capture the flag",
     "awareness"
   ],
-  "homepage": "https://owasp-juice.shop",
+  "homepage": "https://github.com/amaninsa/owasp-juiceshop-chatbot",
   "bugs": {
     "url": "https://github.com/juice-shop/juice-shop/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/juice-shop/juice-shop.git"
+    "url": "https://github.com/amaninsa/owasp-juiceshop-chatbot.git"
   },
   "license": "MIT",
-  "author": "Björn Kimminich <bjoern.kimminich@owasp.org> (https://kimminich.de)",
+  "author": "Bj\u00f6rn Kimminich <bjoern.kimminich@owasp.org> (https://kimminich.de)",
   "contributors": [
-    "Björn Kimminich",
+    "Bj\u00f6rn Kimminich",
     "Jannik Hollenbach",
     "Aashish683",
     "greenkeeper[bot]",

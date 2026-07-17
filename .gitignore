@@ -1,6 +1,71 @@
-# App
+# OWASP Juice Shop Chatbot — .gitignore
+
+# Secrets & env (never commit)
+.env
+.env.*
+!.env.example
+!.env*.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.crt
+credentials.json
+**/secrets/**/*.yaml
+!**/secret.example.yaml
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+.venv/
+backend/.venv/
+ai-assistant/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# Node / frontend
 node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+.nyc_output/
+.sass-cache/
+
+# Build / caches
+build/
+dist/
+tmp/
+.cache/
+cache/
+coverage/
+logs/
+*.log
+*.orig
+*.out
+/bom.json
+/bom.xml
+JSON
+JSON.map
+frontend/src/**/*.js
+
+# Local data / DBs
 *.sqlite
+*.sqlite-journal
+/data/juiceshop.sqlite-journal
+/data/kind/
+chroma_data/
+**/chroma/
+
+# App runtime
 order_*.pdf
 app/
 !frontend/src/app
@@ -12,44 +77,8 @@ i18n/*.json
 i18n/*.invalid
 !frontend/src/assets/i18n/*.json
 !data/static/i18n/*.json
-/data/juiceshop.sqlite-journal
 
-# Build
-.nyc_output/
-.sass-cache/
-build/
-.env.openai
-cache/
-coverage/
-dist/
-logs/
-vagrant/.vagrant/
-*.orig
-*.out
-*.log
-JSON
-JSON.map
-frontend/src/**/*.js
-/bom.json
-/bom.xml
-
-# IDEs
-.idea/
-.vscode/
-out/
-*.eml
-*.iml
-*.iws
-*.swp
-.ai/mcp/mcp.json
-.junie/memory/
-.junie/plans/
-
-# Branch ghpages
-assets/
-!frontend/src/assets/
-
-# Custom configuration files
+# Config overlays (keep defaults)
 config/*.yml
 !config/addo.yml
 !config/bodgeit.yml
@@ -66,9 +95,27 @@ config/*.yml
 !config/oss.yml
 !config/defcon33.yml
 
-# System Files
+# IDE / OS
+.idea/
+.vscode/
 .DS_Store
-
-# Misc
+*.eml
+*.iml
+*.iws
+*.swp
+out/
+.ai/mcp/mcp.json
+.junie/memory/
+.junie/plans/
 .playwright-mcp/
+.colima/
+.cursor/
+
+# Tests / screenshots
 cypress/screenshots/
+cypress/videos/
+vagrant/.vagrant/
+
+# gh-pages assets quirk (upstream)
+assets/
+!frontend/src/assets/

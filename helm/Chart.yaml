@@ -1,0 +1,19 @@
+apiVersion: v2
+name: owasp-juiceshop-chatbot
+description: OWASP Juice Shop with RAG AI Assistant (FastAPI + ChromaDB)
+type: application
+version: 0.1.0
+appVersion: "1.1.0"
+keywords:
+  - juice-shop
+  - rag
+  - fastapi
+  - chromadb
+  - openai
+home: https://github.com/amaninsa/owasp-juiceshop-chatbot
+sources:
+  - https://github.com/amaninsa/owasp-juiceshop-chatbot
+maintainers:
+  - name: amaninsa
+    url: https://github.com/amaninsa/owasp-juiceshop-chatbot
+icon: https://raw.githubusercontent.com/amaninsa/owasp-juiceshop-chatbot/master/frontend/src/assets/public/images/JuiceShop_Logo.png

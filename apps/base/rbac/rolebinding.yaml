@@ -1,0 +1,38 @@
+# Least-privilege Role: backend may read its ConfigMap + Secret only.
+# Frontend/ChromaDB SAs have no RoleBinding (no Kubernetes API access).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: juiceshop-chatbot-backend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot-backend
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["juiceshop-chatbot-config"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["juiceshop-chatbot-secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: juiceshop-chatbot-backend
+  namespace: juiceshop-chatbot
+  labels:
+    app.kubernetes.io/name: juiceshop-chatbot-backend
+    app.kubernetes.io/part-of: juiceshop-chatbot
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: juiceshop-chatbot-backend
+subjects:
+  - kind: ServiceAccount
+    name: juiceshop-chatbot-backend
+    namespace: juiceshop-chatbot

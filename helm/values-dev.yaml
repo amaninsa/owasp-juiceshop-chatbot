@@ -1,0 +1,49 @@
+# Development overrides — smaller footprint, faster feedback
+# CI (update-gitops-tags) bumps image.tag to the short git SHA after each push.
+frontend:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-frontend
+    tag: "dev"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+backend:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-backend
+    tag: "dev"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  rag:
+    ingestOnStartup: true
+    ingestReset: false
+    chromaWaitTimeoutSeconds: 120
+
+chromadb:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-chromadb
+    tag: "dev"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  persistence:
+    size: 2Gi
+
+ingress:
+  host: juiceshop-chatbot.dev.local

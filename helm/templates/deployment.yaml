@@ -1,0 +1,304 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "juiceshop-chatbot.frontend.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "juiceshop-chatbot.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "juiceshop-chatbot.frontend.fullname" . }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "frontend") | nindent 8 }}
+        {{- include "juiceshop-chatbot.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "juiceshop-chatbot.frontend.fullname" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.frontend.podAntiAffinity }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: frontend
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: kubernetes.io/hostname
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.frontend.securityContext | nindent 8 }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: {{ include "juiceshop-chatbot.image" .Values.frontend.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.port }}
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "juiceshop-chatbot.configmapName" . }}
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "juiceshop-chatbot.configmapName" . }}
+                  key: PORT
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: {{ .Values.frontend.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.frontend.probes.startup.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: {{ .Values.frontend.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: {{ .Values.frontend.probes.liveness.periodSeconds }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+---
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "juiceshop-chatbot.backend.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "juiceshop-chatbot.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "juiceshop-chatbot.backend.fullname" . }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "backend") | nindent 8 }}
+        {{- include "juiceshop-chatbot.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.backend.service.port | quote }}
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: {{ include "juiceshop-chatbot.backend.fullname" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.backend.podAntiAffinity }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: backend
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                topologyKey: kubernetes.io/hostname
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.backend.securityContext | nindent 8 }}
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if and .Values.backend.waitForChroma.enabled .Values.chromadb.enabled }}
+      initContainers:
+        - name: wait-for-chromadb
+          image: {{ .Values.backend.waitForChroma.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              echo "Waiting for ChromaDB..."
+              until curl -fsS "http://{{ include "juiceshop-chatbot.chromadb.fullname" . }}:{{ .Values.chromadb.service.port }}/api/v1/heartbeat" >/dev/null; do
+                sleep 2
+              done
+              echo "ChromaDB is ready."
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      {{- end }}
+      containers:
+        - name: backend
+          image: {{ include "juiceshop-chatbot.image" .Values.backend.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "juiceshop-chatbot.configmapName" . }}
+            - secretRef:
+                name: {{ include "juiceshop-chatbot.secretName" . }}
+          env:
+            - name: CHROMA_HOST
+              value: {{ include "juiceshop-chatbot.chromadb.fullname" . | quote }}
+            - name: CHROMA_PORT
+              value: {{ .Values.chromadb.service.port | quote }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            failureThreshold: {{ .Values.backend.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.backend.probes.startup.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: {{ .Values.backend.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: {{ .Values.backend.probes.liveness.periodSeconds }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+---
+{{- if .Values.chromadb.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "juiceshop-chatbot.chromadb.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "juiceshop-chatbot.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "juiceshop-chatbot.chromadb.fullname" . }}
+    app.kubernetes.io/component: vector-db
+spec:
+  replicas: {{ .Values.chromadb.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "vector-db") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "juiceshop-chatbot.selectorLabels" (dict "root" . "component" "vector-db") | nindent 8 }}
+        {{- include "juiceshop-chatbot.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "juiceshop-chatbot.chromadb.fullname" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.chromadb.securityContext | nindent 8 }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: chromadb
+          image: {{ include "juiceshop-chatbot.image" .Values.chromadb.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.chromadb.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "juiceshop-chatbot.configmapName" . }}
+          volumeMounts:
+            {{- if .Values.chromadb.persistence.enabled }}
+            - name: chroma-data
+              mountPath: /chroma/chroma
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.chromadb.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: http
+            failureThreshold: {{ .Values.chromadb.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.chromadb.probes.startup.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: http
+            periodSeconds: {{ .Values.chromadb.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: http
+            periodSeconds: {{ .Values.chromadb.probes.liveness.periodSeconds }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            readOnlyRootFilesystem: false
+      volumes:
+        {{- if .Values.chromadb.persistence.enabled }}
+        - name: chroma-data
+          persistentVolumeClaim:
+            claimName: {{ include "juiceshop-chatbot.chromadb.fullname" . }}-pvc
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

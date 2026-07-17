@@ -1,0 +1,44 @@
+# Development overlay
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: juiceshop-chatbot
+
+resources:
+  - ../../base
+
+images:
+  - name: owasp-juiceshop-chatbot-chromadb
+    newName: ghcr.io/amaninsa/owasp-juiceshop-chatbot-chromadb
+    newTag: dev
+  - name: owasp-juiceshop-chatbot-backend
+    newName: ghcr.io/amaninsa/owasp-juiceshop-chatbot-backend
+    newTag: dev
+  - name: owasp-juiceshop-chatbot-frontend
+    newName: ghcr.io/amaninsa/owasp-juiceshop-chatbot-frontend
+    newTag: dev
+
+replicas:
+  - name: juiceshop-chatbot-frontend
+    count: 1
+  - name: juiceshop-chatbot-backend
+    count: 1
+  - name: juiceshop-chatbot-chromadb
+    count: 1
+
+patches:
+  - path: patches/ingress-host.yaml
+  - path: patches/configmap-dev.yaml
+  - path: patches/resources-dev.yaml
+  - target:
+      kind: PersistentVolumeClaim
+      name: juiceshop-chatbot-chromadb-pvc
+    patch: |-
+      - op: remove
+        path: /spec/volumeName
+      - op: replace
+        path: /spec/storageClassName
+        value: standard
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

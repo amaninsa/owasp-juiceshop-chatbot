@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: juiceshop-chatbot-backend
+  namespace: juiceshop-chatbot
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  # TLS can be enabled when cert-manager + DNS are configured
+  # tls:
+  #   - hosts: [juiceshop-chatbot.example.com]
+  #     secretName: juiceshop-chatbot-tls
+  rules:
+    - host: juiceshop-chatbot.example.com
+      http:
+        paths:
+          - path: /ai-assistant(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: juiceshop-chatbot-backend
+                port:
+                  number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: juiceshop-chatbot-frontend
+  namespace: juiceshop-chatbot
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  rules:
+    - host: juiceshop-chatbot.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: juiceshop-chatbot-frontend
+                port:
+                  number: 3000

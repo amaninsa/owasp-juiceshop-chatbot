@@ -1,0 +1,60 @@
+# Local KIND overrides — matches make kind-up / kind-config.yaml
+imagePullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-frontend
+    tag: local
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+backend:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-backend
+    tag: local
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  openai:
+    # Leave empty and use scripts/deploy secret, or set via --set backend.openai.apiKey=...
+    apiKey: ""
+    existingSecret: juiceshop-chatbot-secrets
+    existingSecretKey: OPEN_AI_KEY
+  rag:
+    ingestOnStartup: true
+    ingestReset: false
+
+chromadb:
+  replicaCount: 1
+  image:
+    repository: owasp-juiceshop-chatbot-chromadb
+    tag: local
+  persistence:
+    enabled: true
+    storageClassName: juiceshop-chatbot-chromadb
+    size: 5Gi
+    createHostPathPV: true
+    hostPath: /mnt/data/juiceshop-chatbot-chromadb
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: juiceshop-chatbot.local

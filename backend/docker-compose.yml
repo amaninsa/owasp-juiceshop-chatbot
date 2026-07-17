@@ -1,0 +1,17 @@
+# Deprecated: use the root ../docker-compose.yml which runs
+# Juice Shop + AI assistant + ChromaDB + nginx gateway together.
+services:
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: owasp-juiceshop-chatbot-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
