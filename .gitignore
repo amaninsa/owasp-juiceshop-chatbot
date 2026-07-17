@@ -18,6 +18,7 @@ i18n/*.invalid
 .nyc_output/
 .sass-cache/
 build/
+.env.openai
 cache/
 coverage/
 dist/
