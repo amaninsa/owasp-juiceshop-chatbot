@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout main (full history for push)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           # GITHUB_TOKEN can push to the same repo when contents: write
