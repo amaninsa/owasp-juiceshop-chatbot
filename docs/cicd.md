@@ -2,6 +2,17 @@
 
 Canonical deep dive: [`github-actions.md`](./github-actions.md)
 
+## Status (verified)
+
+Latest verified main delivery path:
+
+1. **CI** — Black, isort, Ruff, mypy, pytest, npm build, Gitleaks
+2. **CD** — GHCR publish (`ghcr.io/amaninsa/{frontend,backend}:$SHA`) → `kustomize edit set image` on `apps/overlays/local` → Git commit → Argo CD
+3. **Security** — Gitleaks, Trivy FS/config, CodeQL
+
+Images are public on GHCR. ChromaDB remains the local KIND image tag for demos.
+
+
 ## Pipelines
 
 | Workflow | Trigger | Outcome |
