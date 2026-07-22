@@ -104,8 +104,6 @@ jobs:
             ghcr.io/${ownerLc}/frontend:${sha}
             ghcr.io/${ownerLc}/backend:${tag}
             ghcr.io/${ownerLc}/backend:${sha}
-            ghcr.io/${ownerLc}/chromadb:${tag}
-            ghcr.io/${ownerLc}/chromadb:${sha}
             \`\`\`
 
             ## Deployment

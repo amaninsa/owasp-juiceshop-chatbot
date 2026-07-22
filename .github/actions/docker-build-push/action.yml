@@ -63,7 +63,10 @@ runs:
         exit-code: "1"
         severity: ${{ inputs.trivy-severity }}
         ignore-unfixed: true
+        # Prefer fixing CVEs in Dockerfiles; keep ignore file empty unless documented.
         trivyignores: .trivyignore
+        vuln-type: os,library
+        scanners: vuln
 
     - name: Push tags to GHCR
       if: inputs.push == 'true'

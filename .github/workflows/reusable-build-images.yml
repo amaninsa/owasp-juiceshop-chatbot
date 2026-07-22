@@ -1,9 +1,10 @@
-# Reusable workflow: build + push frontend/backend/chromadb to GHCR
+# Reusable workflow: build + push frontend/backend to GHCR
 #
-# Enterprise image naming (requested):
+# Image naming:
 #   ghcr.io/<owner>/frontend:<git-sha>
 #   ghcr.io/<owner>/backend:<git-sha>
-#   ghcr.io/<owner>/chromadb:<git-sha>   # required for RAG stack completeness
+#
+# ChromaDB remains a local/KIND image for demos (see apps/overlays/local).
 name: Reusable — Build & Push Images
 
 on:
@@ -30,9 +31,6 @@ on:
       backend_image:
         description: Backend image ref
         value: ${{ jobs.summary.outputs.backend_image }}
-      chromadb_image:
-        description: ChromaDB image ref
-        value: ${{ jobs.summary.outputs.chromadb_image }}
       image_tag:
         description: Primary tag (git SHA)
         value: ${{ jobs.summary.outputs.image_tag }}
@@ -63,10 +61,6 @@ jobs:
             context: .
             file: backend/Dockerfile
             repo: backend
-          - name: chromadb
-            context: .
-            file: chromadb/Dockerfile
-            repo: chromadb
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -111,7 +105,6 @@ jobs:
     outputs:
       frontend_image: ${{ steps.out.outputs.frontend_image }}
       backend_image: ${{ steps.out.outputs.backend_image }}
-      chromadb_image: ${{ steps.out.outputs.chromadb_image }}
       image_tag: ${{ steps.out.outputs.image_tag }}
     steps:
       - id: out
@@ -121,4 +114,3 @@ jobs:
           echo "image_tag=${SHA}" >> "$GITHUB_OUTPUT"
           echo "frontend_image=${{ env.REGISTRY }}/${OWNER}/frontend:${SHA}" >> "$GITHUB_OUTPUT"
           echo "backend_image=${{ env.REGISTRY }}/${OWNER}/backend:${SHA}" >> "$GITHUB_OUTPUT"
-          echo "chromadb_image=${{ env.REGISTRY }}/${OWNER}/chromadb:${SHA}" >> "$GITHUB_OUTPUT"

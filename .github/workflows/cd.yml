@@ -123,12 +123,11 @@ jobs:
           fi
 
           git commit -m "$(cat <<EOF
-          chore(gitops): bump local images to ${TAG} [skip ci]
+          chore(gitops): bump local frontend/backend images to ${TAG} [skip ci]
 
           Images:
             ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/frontend:${TAG}
             ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/backend:${TAG}
-            ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chromadb:${TAG}
 
           Deployed by Argo CD auto-sync only (no kubectl apply).
           EOF

@@ -7,10 +7,15 @@ LABEL org.opencontainers.image.title="OWASP JuiceShop Chatbot ChromaDB" \
       org.opencontainers.image.source="https://github.com/amaninsa/owasp-juiceshop-chatbot"
 
 # Upstream image owns /chroma as root; make log + data dirs writable for non-root (UID 1000).
+# Also patch known CRITICAL OS / Python transitive CVEs flagged by Trivy in CI/CD.
 USER root
-RUN mkdir -p /chroma/chroma \
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && mkdir -p /chroma/chroma \
  && touch /chroma/chroma.log \
- && chown -R 1000:1000 /chroma
+ && chown -R 1000:1000 /chroma \
+ && (python -m pip install --no-cache-dir 'h11>=0.16.0' || pip3 install --no-cache-dir 'h11>=0.16.0' || true) \
+ && rm -rf /var/lib/apt/lists/*
 USER 1000
 
 # Chroma images include Python; use it for a dependency-free health probe.
