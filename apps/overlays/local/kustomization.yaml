@@ -11,13 +11,13 @@ resources:
 images:
 - name: owasp-juiceshop-chatbot-backend
   newName: ghcr.io/amaninsa/backend
-  newTag: 5e9f2b829287157883de6859cc012288c5207db2
+  newTag: c00581aff0f0464b1dccffa56e4e3f9a4a906bed
 - name: owasp-juiceshop-chatbot-chromadb
   newName: owasp-juiceshop-chatbot-chromadb
   newTag: local
 - name: owasp-juiceshop-chatbot-frontend
   newName: ghcr.io/amaninsa/frontend
-  newTag: 5e9f2b829287157883de6859cc012288c5207db2
+  newTag: c00581aff0f0464b1dccffa56e4e3f9a4a906bed
 
 replicas:
 - count: 1
