@@ -3,7 +3,7 @@
 services:
   chromadb:
     image: chromadb/chroma:0.5.23
-    container_name: owasp-juiceshop-chatbot-chromadb
+    container_name: juice-shop-chromadb
     ports:
       - "8001:8000"
     volumes:

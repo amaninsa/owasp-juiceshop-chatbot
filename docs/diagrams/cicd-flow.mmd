@@ -1,0 +1,8 @@
+flowchart LR
+  PR[PR / push] --> SEC[DevSecOps]
+  SEC --> QT[Lint + Tests]
+  QT --> IMG[Docker Build]
+  IMG --> REG[GHCR + Cosign]
+  REG --> TAG[Manifest / tag update]
+  TAG --> ARGO[Argo CD sync]
+  ARGO --> K8S[Kubernetes rollout]

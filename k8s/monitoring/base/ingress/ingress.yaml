@@ -1,0 +1,67 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-grafana
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: juiceshop-chatbot-observability
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grafana.juiceshop-chatbot.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-prometheus
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: juiceshop-chatbot-observability
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: prometheus.juiceshop-chatbot.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/part-of: juiceshop-chatbot-observability
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: alertmanager.juiceshop-chatbot.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager
+                port:
+                  number: 9093

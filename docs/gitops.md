@@ -1,51 +1,103 @@
-# GitOps (ArgoCD + Kustomize)
+# GitOps Workflow (ArgoCD App of Apps)
 
-## Layout
+Canonical delivery: **Git → ArgoCD → Kubernetes**.  
+UI concepts (Sync, Health, Tree, Self Heal, Rollback): **[argocd.md](./argocd.md)**  
+Kustomize under `apps/` is the source of truth. Helm is an alternate packaging path (do not mix in one namespace).
 
+## Why `make argocd-apply` failed before
+
+Argo CD custom resources (`Application`, `AppProject`) require CRDs from the Argo CD install.
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| 1 | `make kind-up` | KIND + ingress-nginx |
+| 2 | `make argocd-install` | Installs Argo CD **including CRDs**, waits, exposes UI |
+| 3 | `make argocd-apply` | Applies AppProject + App-of-Apps root |
+
+Without step 2 you get:
+
+```text
+no matches for kind Application in version argoproj.io/v1alpha1
 ```
-apps/
-  base/                 # canonical manifests (copied from original k8s/)
-  overlays/
-    local/              # KIND (local images + hostPath PV)
-    dev/                # ghcr.dev tags, standard StorageClass
-    prod/               # pinned versions, gp2, 3 replicas
+
+## App of Apps layout
+
+```text
 argocd/
-  project.yaml
-  application-local.yaml
-  application-dev.yaml
-  application-prod.yaml
-  kustomization.yaml
-k8s/
-  kustomization.yaml    # compatibility wrapper → apps/overlays/local
+  project.yaml              # AppProject
+  root-application.yaml     # App of Apps entrypoint
+  ingress.yaml              # UI via nginx (argocd.juiceshop-chatbot.local)
+  kustomization.yaml        # bootstrap: project + root
+  apps/
+    application-local.yaml
+    application-dev.yaml
+    application-prod.yaml
+    application-monitoring.yaml
+apps/overlays/{local,dev,prod,ci}
+```
+
+```mermaid
+flowchart TB
+  ROOT[juiceshop-chatbot-root] --> LOCAL[local]
+  ROOT --> DEV[dev]
+  ROOT --> PROD[prod]
+  ROOT --> MON[monitoring]
+  LOCAL --> NS1[(juiceshop-chatbot)]
+  DEV --> NS2[(juiceshop-chatbot-dev)]
+  PROD --> NS3[(juiceshop-chatbot-prod)]
+  MON --> NS4[(monitoring)]
 ```
 
 ## Sync policy
 
 All Applications enable:
 
-- `automated.prune: true`
-- `automated.selfHeal: true`
+- Automated sync
+- `prune: true`
+- `selfHeal: true`
 - `CreateNamespace=true`
+- `ServerSideApply=true`
+- Retry with exponential backoff
 
-## Bootstrap ArgoCD on KIND (optional)
+Health checks use native Kubernetes readiness (Deployments / DaemonSets).
+
+## Bootstrap (KIND)
 
 ```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+make kind-up
+make argocd-install          # CRDs + server + ingress + prints admin password
+make argocd-apply            # AppProject + root Application
 
-# Wait for pods, then register apps (edit repoURL first!)
-kubectl apply -k argocd/
+# Optional helpers
+make argocd-password
+make argocd-status
+make argocd-ui               # localhost:8081
 ```
 
-## Point Applications at your fork
+Hosts file:
 
-Edit `repoURL` / `targetRevision` in:
+```text
+127.0.0.1 argocd.juiceshop-chatbot.local
+```
 
-- `argocd/application-local.yaml`
-- `argocd/application-dev.yaml`
-- `argocd/application-prod.yaml`
+UI: http://argocd.juiceshop-chatbot.local:8080 (`admin` / `make argocd-password`)
 
-## Secrets (never committed)
+## Environment mapping
+
+| App | Git revision | Overlay | Namespace |
+|-----|--------------|---------|-----------|
+| local | `HEAD` | `apps/overlays/local` | `juiceshop-chatbot` |
+| dev | `develop` | `apps/overlays/dev` | `juiceshop-chatbot-dev` |
+| prod | `main` | `apps/overlays/prod` | `juiceshop-chatbot-prod` |
+| monitoring | `HEAD` | `k8s/monitoring/local` | `monitoring` |
+
+## CI → GitOps (no kubectl apply for CD)
+
+1. Platform CI builds, scans, signs, pushes GHCR.
+2. CI commits image tag bumps to overlays.
+3. ArgoCD detects Git change and syncs automatically.
+
+## Secrets (never in Git)
 
 ```bash
 kubectl -n juiceshop-chatbot create secret generic juiceshop-chatbot-secrets \
@@ -53,24 +105,17 @@ kubectl -n juiceshop-chatbot create secret generic juiceshop-chatbot-secrets \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-## Validate overlays without ArgoCD
+## EKS portability
+
+1. Register EKS as an ArgoCD cluster destination.
+2. Update `destination.server` on child Applications (or ApplicationSets).
+3. Swap StorageClass to your CSI (`gp3`, etc.).
+4. Keep CI unchanged — it only commits Git; Argo deploys.
+
+## Validate without a cluster
 
 ```bash
-kubectl kustomize apps/overlays/local
+kubectl kustomize argocd
+kubectl kustomize argocd/apps
 kubectl kustomize apps/overlays/dev
-kubectl kustomize apps/overlays/prod
 ```
-
-## Flow
-
-1. PR merges to `develop` / `main`
-2. ArgoCD detects Git change
-3. Auto-sync applies Kustomize overlay
-4. Self-heal reverts manual cluster drift
-5. Prune removes deleted manifests
-
-## Related docs
-
-- [KIND deployment](kind-deployment.md)
-- [Helm](helm.md)
-- [CI/CD](ci-cd.md)

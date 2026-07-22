@@ -1,0 +1,124 @@
+# Reusable workflow: build + push frontend/backend/chromadb to GHCR
+#
+# Enterprise image naming (requested):
+#   ghcr.io/<owner>/frontend:<git-sha>
+#   ghcr.io/<owner>/backend:<git-sha>
+#   ghcr.io/<owner>/chromadb:<git-sha>   # required for RAG stack completeness
+name: Reusable — Build & Push Images
+
+on:
+  workflow_call:
+    inputs:
+      git-sha:
+        description: Full git SHA used as primary image tag
+        required: true
+        type: string
+      push:
+        description: Push images to GHCR
+        required: false
+        type: boolean
+        default: true
+      extra-tag:
+        description: Optional additional tag (e.g. latest, v1.2.3)
+        required: false
+        type: string
+        default: ""
+    outputs:
+      frontend_image:
+        description: Frontend image ref
+        value: ${{ jobs.summary.outputs.frontend_image }}
+      backend_image:
+        description: Backend image ref
+        value: ${{ jobs.summary.outputs.backend_image }}
+      chromadb_image:
+        description: ChromaDB image ref
+        value: ${{ jobs.summary.outputs.chromadb_image }}
+      image_tag:
+        description: Primary tag (git SHA)
+        value: ${{ jobs.summary.outputs.image_tag }}
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: frontend
+            context: .
+            file: Dockerfile
+            repo: frontend
+          - name: backend
+            context: .
+            file: backend/Dockerfile
+            repo: backend
+          - name: chromadb
+            context: .
+            file: chromadb/Dockerfile
+            repo: chromadb
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Repository owner (lowercase)
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Compose tags
+        id: tags
+        run: |
+          {
+            echo "list<<EOF"
+            echo "${{ inputs.git-sha }}"
+            if [[ -n "${{ inputs.extra-tag }}" ]]; then
+              echo "${{ inputs.extra-tag }}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: ${{ inputs.push }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build, Trivy-scan, push
+        uses: ./.github/actions/docker-build-push
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/${{ matrix.repo }}
+          tags: ${{ steps.tags.outputs.list }}
+          push: ${{ inputs.push && 'true' || 'false' }}
+
+  summary:
+    name: Image refs
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_image: ${{ steps.out.outputs.frontend_image }}
+      backend_image: ${{ steps.out.outputs.backend_image }}
+      chromadb_image: ${{ steps.out.outputs.chromadb_image }}
+      image_tag: ${{ steps.out.outputs.image_tag }}
+    steps:
+      - id: out
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          SHA="${{ inputs.git-sha }}"
+          echo "image_tag=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${{ env.REGISTRY }}/${OWNER}/frontend:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=${{ env.REGISTRY }}/${OWNER}/backend:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "chromadb_image=${{ env.REGISTRY }}/${OWNER}/chromadb:${SHA}" >> "$GITHUB_OUTPUT"

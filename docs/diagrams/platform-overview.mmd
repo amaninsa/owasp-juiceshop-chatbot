@@ -1,0 +1,31 @@
+flowchart TB
+  DEV[Developer] --> GH[GitHub Repository]
+  GH --> GHA[GitHub Actions<br/>Platform CI/CD]
+  GHA --> BUILD[Docker Build<br/>+ Trivy / Syft / Cosign]
+  BUILD --> GHCR[GitHub Container Registry]
+  GHCR --> ARGO[Argo CD<br/>App of Apps]
+  ARGO --> K8S[Kubernetes / KIND]
+
+  subgraph Runtime["Namespace: juiceshop-chatbot"]
+    FE[Frontend<br/>Angular Juice Shop]
+    BE[Backend<br/>FastAPI RAG]
+    CH[(ChromaDB)]
+  end
+
+  K8S --> FE
+  K8S --> BE
+  K8S --> CH
+  BE --> CH
+  BE --> OAI[OpenAI API]
+
+  subgraph Obs["Namespace: monitoring"]
+    PROM[Prometheus]
+    GRAF[Grafana]
+    LOKI[Loki]
+    AM[Alertmanager]
+  end
+
+  BE -->|/metrics| PROM
+  PROM --> GRAF
+  PROM --> AM
+  LOKI --> GRAF

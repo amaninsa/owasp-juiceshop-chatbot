@@ -30,7 +30,7 @@ if [[ "${BUILD_IMAGES}" == "true" ]]; then
   log "Building local images via docker compose..."
   (
     cd "${ROOT_DIR}"
-    docker compose build chromadb backend juice-shop
+    docker compose build chromadb backend frontend
   )
 fi
 

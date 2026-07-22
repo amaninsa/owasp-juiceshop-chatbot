@@ -1,0 +1,128 @@
+# =============================================================================
+# Release — Git tags v* → notes, images, GitHub Release
+# =============================================================================
+# On tag push matching v*:
+#   1) Generate release notes from GitHub API
+#   2) Build & push images tagged with the version + git SHA
+#   3) Create a GitHub Release attaching the notes
+#
+# Production overlay tags can be bumped in a follow-up PR or extended here;
+# runtime deploy remains Argo CD GitOps only.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.2.3) — must already exist"
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  security-events: write
+
+jobs:
+  meta:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${VERSION} @ ${GITHUB_SHA}"
+
+  build-push:
+    name: Build & push release images
+    needs: meta
+    uses: ./.github/workflows/reusable-build-images.yml
+    with:
+      git-sha: ${{ needs.meta.outputs.sha }}
+      push: true
+      extra-tag: ${{ needs.meta.outputs.version }}
+    secrets: inherit
+
+  github-release:
+    name: Create GitHub Release
+    needs: [meta, build-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.meta.outputs.version }}
+
+      - name: Generate release notes
+        id: notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ needs.meta.outputs.version }}';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            let notes;
+            try {
+              const res = await github.rest.repos.generateReleaseNotes({
+                owner, repo, tag_name: tag, target_commitish: '${{ needs.meta.outputs.sha }}'
+              });
+              notes = res.data.body;
+            } catch (e) {
+              notes = `Release ${tag}\n\nAutomated release from tag ${tag}.`;
+            }
+            const ownerLc = owner.toLowerCase();
+            const sha = '${{ needs.meta.outputs.sha }}';
+            const footer = `
+
+            ## Container images
+
+            \`\`\`
+            ghcr.io/${ownerLc}/frontend:${tag}
+            ghcr.io/${ownerLc}/frontend:${sha}
+            ghcr.io/${ownerLc}/backend:${tag}
+            ghcr.io/${ownerLc}/backend:${sha}
+            ghcr.io/${ownerLc}/chromadb:${tag}
+            ghcr.io/${ownerLc}/chromadb:${sha}
+            \`\`\`
+
+            ## Deployment
+
+            Images are published to GHCR. Cluster updates happen via **Argo CD GitOps**
+            after Kustomize overlays reference these tags (see \`cd.yml\` for main).
+            `;
+            core.setOutput('body', notes + footer);
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.meta.outputs.version }}
+          name: ${{ needs.meta.outputs.version }}
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: false
+          draft: false
+          prerelease: ${{ contains(needs.meta.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

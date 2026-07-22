@@ -117,7 +117,8 @@ spec:
             capabilities:
               drop:
                 - ALL
-            readOnlyRootFilesystem: true
+            # App writes SQLite under data/ and restores ftp/legal.md at startup.
+            readOnlyRootFilesystem: false
       volumes:
         - name: tmp
           emptyDir: {}

@@ -20,7 +20,7 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-COPY backend/requirements.txt /build/requirements.txt
+COPY ai-assistant/requirements.txt /build/requirements.txt
 RUN pip install --upgrade pip \
   && pip install -r /build/requirements.txt
 
@@ -33,12 +33,12 @@ ARG BUILD_DATE
 ARG VCS_REF
 ARG VERSION=1.1.0
 
-LABEL org.opencontainers.image.title="OWASP JuiceShop Chatbot Backend" \
+LABEL org.opencontainers.image.title="Juice Shop AI Assistant" \
       org.opencontainers.image.description="RAG-powered FastAPI assistant for OWASP Juice Shop products" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.source="https://github.com/amaninsa/owasp-juiceshop-chatbot"
+      org.opencontainers.image.source="https://github.com/juice-shop/juice-shop"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -62,9 +62,9 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
 
-COPY --chown=appuser:appgroup backend/ /app/
+COPY --chown=appuser:appgroup ai-assistant/ /app/
 COPY --chown=appuser:appgroup config/default.yml /data/config/default.yml
-COPY --chown=appuser:appgroup backend/entrypoint.sh /entrypoint.sh
+COPY --chown=appuser:appgroup ai-assistant/entrypoint.sh /entrypoint.sh
 
 RUN chmod 755 /entrypoint.sh \
   && mkdir -p /tmp/app \

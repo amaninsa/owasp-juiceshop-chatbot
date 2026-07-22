@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: juiceshop-chatbot-observability
+    app.kubernetes.io/component: alerts
+data:
+  juiceshop-chatbot.yml: |
+    groups:
+      - name: juiceshop-chatbot.pods
+        rules:
+          - alert: BackendPodDown
+            expr: |
+              (
+                kube_deployment_status_replicas_available{namespace="juiceshop-chatbot", deployment="juiceshop-chatbot-backend"}
+                < 1
+              )
+              or
+              (
+                up{job="juiceshop-chatbot-backend"} == 0
+              )
+            for: 2m
+            labels:
+              severity: critical
+              component: backend
+            annotations:
+              summary: "Backend pod is down"
+              description: "juiceshop-chatbot-backend has no available replicas or scrape target is down for >2m."
+
+          - alert: PodRestartingFrequently
+            expr: |
+              increase(kube_pod_container_status_restarts_total{namespace="juiceshop-chatbot"}[15m]) > 3
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.pod }} restarting frequently"
+              description: "Container {{ $labels.container }} in {{ $labels.pod }} restarted >3 times in 15m."
+
+          - alert: PodCrashLoopBackOff
+            expr: |
+              kube_pod_container_status_waiting_reason{namespace="juiceshop-chatbot", reason="CrashLoopBackOff"} == 1
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} in CrashLoopBackOff"
+              description: "Container {{ $labels.container }} is crash-looping."
+
+          - alert: NodeNotReady
+            expr: |
+              kube_node_status_condition{condition="Ready", status="true"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node {{ $labels.node }} not Ready"
+              description: "Kubernetes node is not Ready for >2m."
+
+      - name: juiceshop-chatbot.resources
+        rules:
+          - alert: HighCPUUsage
+            expr: |
+              (
+                sum by (pod, namespace) (
+                  rate(container_cpu_usage_seconds_total{namespace="juiceshop-chatbot", container!="", container!="POD"}[5m])
+                )
+                /
+                sum by (pod, namespace) (
+                  kube_pod_container_resource_limits{namespace="juiceshop-chatbot", resource="cpu"}
+                )
+              ) > 0.80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "CPU > 80% on {{ $labels.pod }}"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} CPU usage exceeds 80% of limit for 5m."
+
+          - alert: HighMemoryUsage
+            expr: |
+              (
+                sum by (pod, namespace) (
+                  container_memory_working_set_bytes{namespace="juiceshop-chatbot", container!="", container!="POD"}
+                )
+                /
+                sum by (pod, namespace) (
+                  kube_pod_container_resource_limits{namespace="juiceshop-chatbot", resource="memory"}
+                )
+              ) > 0.80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Memory > 80% on {{ $labels.pod }}"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} memory usage exceeds 80% of limit for 5m."
+
+          - alert: PVCAlmostFull
+            expr: |
+              (
+                kubelet_volume_stats_used_bytes{namespace="juiceshop-chatbot"}
+                /
+                kubelet_volume_stats_capacity_bytes{namespace="juiceshop-chatbot"}
+              ) > 0.85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PVC almost full ({{ $labels.persistentvolumeclaim }})"
+              description: "Volume {{ $labels.persistentvolumeclaim }} is >85% full."
+
+      - name: juiceshop-chatbot.http
+        rules:
+          - alert: HighHTTP5xxRate
+            expr: |
+              (
+                sum(rate(juiceshop_chatbot_http_requests_total{status=~"5.."}[5m]))
+                /
+                clamp_min(sum(rate(juiceshop_chatbot_http_requests_total[5m])), 1e-9)
+              ) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+              component: backend
+            annotations:
+              summary: "High HTTP 5xx rate on backend"
+              description: "More than 5% of backend HTTP requests are 5xx over 5m."
+
+          - alert: SlowAPIResponse
+            expr: |
+              histogram_quantile(
+                0.95,
+                sum(rate(juiceshop_chatbot_http_request_duration_seconds_bucket[5m])) by (le, path)
+              ) > 1
+            for: 5m
+            labels:
+              severity: warning
+              component: backend
+            annotations:
+              summary: "Slow API response on {{ $labels.path }}"
+              description: "p95 latency for {{ $labels.path }} is >1s for 5m."

@@ -1,0 +1,81 @@
+# Composite: Build, scan (Trivy), and push one image to GHCR
+name: Docker build push
+description: Build a container image, Trivy-scan it, push to GHCR
+inputs:
+  context:
+    description: Docker build context
+    required: true
+  file:
+    description: Dockerfile path
+    required: true
+  image:
+    description: Fully qualified image name without tag (e.g. ghcr.io/owner/frontend)
+    required: true
+  tags:
+    description: Newline-separated tags (without image name)
+    required: true
+  push:
+    description: Whether to push (false = load locally for PR dry-run)
+    required: false
+    default: "true"
+  trivy-severity:
+    description: Severities that fail the gate
+    required: false
+    # CRITICAL only: Juice Shop / Node base images commonly ship HIGH CVEs
+    default: "CRITICAL"
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Derive primary tag
+      id: tag
+      shell: bash
+      run: |
+        PRIMARY="$(echo "${{ inputs.tags }}" | head -n1 | tr -d '[:space:]')"
+        echo "primary=${PRIMARY}" >> "$GITHUB_OUTPUT"
+        {
+          echo "tag_list<<EOF"
+          echo "${{ inputs.tags }}"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Build image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.file }}
+        push: false
+        load: true
+        tags: ${{ inputs.image }}:${{ steps.tag.outputs.primary }}
+        cache-from: type=gha,scope=${{ inputs.image }}
+        cache-to: type=gha,mode=max,scope=${{ inputs.image }}
+        provenance: false
+        sbom: false
+
+    - name: Trivy image scan (fail on CRITICAL)
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ inputs.image }}:${{ steps.tag.outputs.primary }}
+        format: table
+        exit-code: "1"
+        severity: ${{ inputs.trivy-severity }}
+        ignore-unfixed: true
+        trivyignores: .trivyignore
+
+    - name: Push tags to GHCR
+      if: inputs.push == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        IMG="${{ inputs.image }}"
+        PRIMARY="${{ steps.tag.outputs.primary }}"
+        while IFS= read -r t; do
+          t="$(echo "$t" | tr -d '[:space:]')"
+          [[ -z "$t" ]] && continue
+          docker tag "${IMG}:${PRIMARY}" "${IMG}:${t}"
+          docker push "${IMG}:${t}"
+          echo "Pushed ${IMG}:${t}"
+        done <<< "${{ inputs.tags }}"

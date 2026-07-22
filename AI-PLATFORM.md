@@ -97,7 +97,7 @@ flowchart LR
 | Gateway | `deploy/` | nginx same-origin proxy (Compose) |
 | GitOps | `apps/`, `argocd/` | Kustomize + ArgoCD |
 | Helm | `helm/` | Packaged install |
-| CI | `.github/workflows/ai-platform-ci.yml` | Lint, test, build, scan, deploy |
+| CI | `.github/workflows/platform-ci.yml` | Full CI/CD + DevSecOps + GitOps |
 
 ---
 
@@ -210,43 +210,52 @@ Guide: [docs/helm.md](./docs/helm.md)
 
 ---
 
-## GitOps (ArgoCD)
+## GitOps (ArgoCD App of Apps)
 
 ```mermaid
 flowchart TB
-  Git[Git: apps/overlays/*] -->|watch| Argo[ArgoCD Application]
-  Argo -->|auto-sync prune selfHeal| Cluster[juiceshop-chatbot ns]
-  CI[GitHub Actions] -->|bump image tags| Git
+  CI[Platform CI/CD] -->|bump tags| Git[Git overlays]
+  Git --> Root[ArgoCD Root App]
+  Root --> Local[local]
+  Root --> Dev[dev]
+  Root --> Prod[prod]
+  Root --> Mon[monitoring]
+  Local --> N1[(juiceshop-chatbot)]
+  Dev --> N2[(juiceshop-chatbot-dev)]
+  Prod --> N3[(juiceshop-chatbot-prod)]
+  Mon --> N4[(monitoring)]
 ```
 
-| Overlay | Purpose |
-|---------|---------|
-| `apps/overlays/local` | KIND (`*:local`, hostPath PV) |
-| `apps/overlays/dev` | GHCR tags, standard StorageClass |
-| `apps/overlays/prod` | Pinned tags, `imagePullPolicy: Always` |
-| `apps/overlays/ci` | Ephemeral CI KIND (no NetworkPolicy) |
+| Overlay | Namespace | Purpose |
+|---------|-----------|---------|
+| `apps/overlays/local` | `juiceshop-chatbot` | KIND (`*:local`, hostPath PV) |
+| `apps/overlays/dev` | `juiceshop-chatbot-dev` | GHCR SHA tags |
+| `apps/overlays/prod` | `juiceshop-chatbot-prod` | Pinned versions |
+| `apps/overlays/ci` | `juiceshop-chatbot` | Ephemeral CI KIND |
 
-Bootstrap: [docs/gitops.md](./docs/gitops.md)
+Bootstrap: [docs/gitops.md](./docs/gitops.md) · `make argocd-apply`
 
 ---
 
-## CI/CD
+## CI/CD + DevSecOps
 
-Workflow: [`.github/workflows/ai-platform-ci.yml`](./.github/workflows/ai-platform-ci.yml)
+Workflow: [`.github/workflows/platform-ci.yml`](./.github/workflows/platform-ci.yml)
 
 ```mermaid
 flowchart LR
-  PR[PR / push] --> L[Ruff + Pytest + ESLint]
-  L --> M[Helm / Kustomize]
-  M --> B[Build + Trivy]
-  B --> P[Push GHCR]
+  PR[PR / push] --> S[Gitleaks Semgrep Trivy audits]
+  S --> L[Ruff Pytest ESLint]
+  L --> M[kubeconform]
+  M --> B[Build + Trivy + Syft]
+  B --> C[Cosign]
+  C --> P[Push GHCR]
   P --> K[KIND smoke]
-  P --> G[Commit GitOps tags]
+  P --> G[GitOps tags → ArgoCD]
 ```
 
-Tags: `latest`, short SHA, semver on `main` / `v*`.
+Tags: `latest`, short SHA, `dev` (develop), semver on `main` / `v*`.
 
-Guide: [docs/ci-cd.md](./docs/ci-cd.md)
+Guides: [docs/ci-cd.md](./docs/ci-cd.md) · [docs/devsecops.md](./docs/devsecops.md) · [docs/deployment.md](./docs/deployment.md)
 
 ---
 

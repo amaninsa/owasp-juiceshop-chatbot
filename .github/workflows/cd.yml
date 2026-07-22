@@ -1,0 +1,164 @@
+# =============================================================================
+# CD — Merge to main → GHCR → Kustomize bump → Git commit → Argo CD sync
+# =============================================================================
+# Flow (no kubectl apply):
+#
+#   push to main
+#        ↓
+#   Build & push ghcr.io/<owner>/{frontend,backend,chromadb}:$GITHUB_SHA
+#        ↓
+#   kustomize edit set image  (apps/overlays/local)
+#        ↓
+#   Commit + push  [skip ci]
+#        ↓
+#   Argo CD detects Git drift → auto-sync → Kubernetes
+#
+# Requires Argo CD Application watching apps/overlays/local (see argocd/apps).
+# =============================================================================
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # Guard: ignore the bot commit that only bumps GitOps manifests
+  guard:
+    name: Should run CD?
+    runs-on: ubuntu-latest
+    outputs:
+      run_cd: ${{ steps.check.outputs.run_cd }}
+    steps:
+      - id: check
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_cd=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${MSG}" == *"[skip ci]"* ]] || [[ "${MSG}" == *"chore(gitops)"* ]]; then
+            echo "run_cd=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping CD — GitOps bump commit"
+          else
+            echo "run_cd=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-push:
+    name: Build & push images
+    needs: guard
+    if: needs.guard.outputs.run_cd == 'true'
+    uses: ./.github/workflows/reusable-build-images.yml
+    with:
+      git-sha: ${{ github.sha }}
+      push: true
+      extra-tag: main
+    secrets: inherit
+
+  gitops:
+    name: Update Kustomize (local overlay) → Git
+    needs: [guard, build-push]
+    if: needs.guard.outputs.run_cd == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main (full history for push)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # GITHUB_TOKEN can push to the same repo when contents: write
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install kustomize
+        run: |
+          set -euo pipefail
+          KUSTOMIZE_VERSION=5.4.3
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kustomize
+          kustomize version
+
+      - name: Owner (lowercase)
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: kustomize edit set image (apps/overlays/local)
+        env:
+          OWNER: ${{ steps.owner.outputs.name }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/gitops-set-images.sh
+          ./scripts/gitops-set-images.sh "${TAG}" "${OWNER}"
+          echo "---- apps/overlays/local/kustomization.yaml ----"
+          cat apps/overlays/local/kustomization.yaml
+          echo "---- rendered image refs ----"
+          kustomize build apps/overlays/local | grep -E '^\s+image:' | sort -u | head -40
+
+      - name: Commit & push GitOps manifests
+        env:
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add apps/overlays/local/kustomization.yaml
+          if git diff --staged --quiet; then
+            echo "No Kustomize changes — images already at ${TAG}"
+            exit 0
+          fi
+
+          git commit -m "$(cat <<EOF
+          chore(gitops): bump local images to ${TAG} [skip ci]
+
+          Images:
+            ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/frontend:${TAG}
+            ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/backend:${TAG}
+            ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chromadb:${TAG}
+
+          Deployed by Argo CD auto-sync only (no kubectl apply).
+          EOF
+          )"
+
+          # Retry push for rare race with another commit
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Pushed GitOps commit — Argo CD will reconcile"
+              exit 0
+            fi
+            echo "Push failed (attempt ${i}) — rebase and retry"
+            git pull --rebase origin main
+          done
+          exit 1
+
+  cd-summary:
+    name: CD summary
+    needs: [guard, build-push, gitops]
+    if: always() && needs.guard.outputs.run_cd == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "## CD complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Step | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build/Push | \`${{ needs.build-push.result }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| GitOps commit | \`${{ needs.gitops.result }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployment path: **Git → Argo CD → Kubernetes** (no kubectl apply)." >> "$GITHUB_STEP_SUMMARY"
+          [[ "${{ needs.build-push.result }}" == "success" ]] || exit 1
+          [[ "${{ needs.gitops.result }}" == "success" ]] || exit 1

@@ -31,7 +31,6 @@ spec:
         prometheus.io/scrape: "false"
     spec:
       serviceAccountName: default
-      # Soft preference: keep vector DB off crowded app nodes when possible
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -41,6 +40,9 @@ spec:
                   - key: node-role.kubernetes.io/control-plane
                     operator: DoesNotExist
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -58,6 +60,8 @@ spec:
           volumeMounts:
             - name: chroma-data
               mountPath: /chroma/chroma
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -89,15 +93,19 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-            # Upstream Chroma image historically expects writable FS + its own user.
             readOnlyRootFilesystem: false
       volumes:
         - name: chroma-data
           persistentVolumeClaim:
             claimName: juiceshop-chatbot-chromadb-pvc
+        - name: tmp
+          emptyDir: {}
       restartPolicy: Always
       terminationGracePeriodSeconds: 30

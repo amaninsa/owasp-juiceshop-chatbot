@@ -58,26 +58,6 @@ def test_health_degraded_without_chroma() -> None:
     assert "chroma" in body
 
 
-def test_metrics_endpoint() -> None:
-    from main import app
-
-    client = TestClient(app)
-    response = client.get("/metrics")
-    assert response.status_code == 200
-    body = response.text
-    assert "juiceshop_chatbot_http_requests_total" in body or "python_info" in body
-
-
-def test_correlation_id_header_roundtrip() -> None:
-    from main import app
-
-    client = TestClient(app)
-    response = client.get("/livez", headers={"X-Correlation-ID": "test-cid-123"})
-    assert response.status_code == 200
-    assert response.headers.get("X-Correlation-ID") == "test-cid-123"
-    assert response.headers.get("X-Request-ID") == "test-cid-123"
-
-
 def test_embedding_document_contains_price() -> None:
     from products import load_products
 

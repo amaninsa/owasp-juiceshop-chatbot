@@ -1,0 +1,158 @@
+# =============================================================================
+# Security — DevSecOps gates (PR + main + weekly schedule)
+# =============================================================================
+# Hard fail: Gitleaks (secrets)
+# Soft / informed fail: Trivy FS on Juice Shop training surface (intentional vulns)
+# Hard fail: Trivy config (IaC), CodeQL analyze upload
+# Image Trivy CRITICAL/HIGH is enforced in reusable-build-images before GHCR push
+# =============================================================================
+name: Security
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks
+    if: ${{ github.event_name != 'push' || (github.event.head_commit != null && !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy-fs:
+    name: Trivy filesystem
+    if: ${{ github.event_name != 'push' || (github.event.head_commit != null && !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy FS scan (report; Juice Shop has intentional vulns)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          # Do not fail the job: upstream Juice Shop is an intentionally vulnerable
+          # training app. Container image gates still fail CLOSED in CI/CD builds.
+          exit-code: "0"
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-fs.sarif
+          trivyignores: .trivyignore
+      - name: Upload Trivy FS SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  trivy-config:
+    name: Trivy config (IaC)
+    if: ${{ github.event_name != 'push' || (github.event.head_commit != null && !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+          trivyignores: .trivyignore
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: critical
+          comment-summary-in-pr: always
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    if: ${{ github.event_name != 'push' || (github.event.head_commit != null && !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - 'data/static/codefixes'
+              - 'owasp-juiceshop-chatbot/**'
+              - 'frontend/src/assets/**'
+            query-filters:
+              - exclude:
+                  id: js/missing-rate-limiting
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  security-gate:
+    name: Security gate
+    if: always()
+    needs: [gitleaks, trivy-fs, trivy-config, dependency-review, codeql]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        run: |
+          set -euo pipefail
+          echo "gitleaks=${{ needs.gitleaks.result }}"
+          echo "trivy-fs=${{ needs.trivy-fs.result }}"
+          echo "trivy-config=${{ needs.trivy-config.result }}"
+          echo "dependency-review=${{ needs.dependency-review.result }}"
+          echo "codeql=${{ needs.codeql.result }}"
+
+          if [[ "${{ needs.gitleaks.result }}" == "skipped" ]]; then
+            echo "Security skipped (GitOps bump)"
+            exit 0
+          fi
+
+          [[ "${{ needs.gitleaks.result }}" == "success" ]] || exit 1
+          [[ "${{ needs.trivy-fs.result }}" == "success" ]] || exit 1
+          [[ "${{ needs.trivy-config.result }}" == "success" ]] || exit 1
+          DR="${{ needs.dependency-review.result }}"
+          [[ "${DR}" == "success" || "${DR}" == "skipped" ]] || exit 1
+          [[ "${{ needs.codeql.result }}" == "success" ]] || exit 1
+          echo "Security gate passed"

@@ -1,0 +1,21 @@
+# Gitleaks configuration for Juice Shop Chatbot platform
+title = "juiceshop-chatbot"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positives / intentional training secrets in Juice Shop"
+paths = [
+  '''data/static/.*''',
+  '''ftp/.*''',
+  '''encryptionkeys/.*''',
+  '''test/.*''',
+  '''frontend/src/assets/.*''',
+  '''\.git/.*''',
+]
+regexes = [
+  '''REPLACE_WITH_REAL_OPENAI_API_KEY''',
+  '''sk-test-placeholder''',
+  '''ci-test-key''',
+]

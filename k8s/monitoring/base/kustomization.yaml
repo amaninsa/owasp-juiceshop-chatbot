@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Shared observability resources. Do NOT set a global namespace:
+# the Prometheus scrape NetworkPolicy must remain in juiceshop-chatbot.
+
+resources:
+  - namespace.yaml
+  - networkpolicy/allow-prometheus-scrape.yaml
+  - prometheus/configmap.yaml
+  - prometheus/deployment.yaml
+  - alerts/rules.yaml
+  - alertmanager/configmap.yaml
+  - alertmanager/deployment.yaml
+  - kube-state-metrics/deployment.yaml
+  - node-exporter/daemonset.yaml
+  - cadvisor/daemonset.yaml
+  - loki/configmap.yaml
+  - loki/deployment.yaml
+  - promtail/configmap.yaml
+  - promtail/daemonset.yaml
+  - datasources/datasources.yaml
+  - grafana/dashboard-provider.yaml
+  - grafana/deployment.yaml
+  - ingress/ingress.yaml
+
+configMapGenerator:
+  - name: grafana-dashboards
+    namespace: monitoring
+    files:
+      - dashboards/k8s-cluster-overview.json
+      - dashboards/k8s-namespace.json
+      - dashboards/k8s-pod.json
+      - dashboards/k8s-deployment.json
+      - dashboards/k8s-node.json
+      - dashboards/k8s-container.json
+      - dashboards/backend-fastapi.json
+      - dashboards/chromadb.json
+      - dashboards/backend-ai-assistant.json
+      - dashboards/logs-overview.json
+    options:
+      disableNameSuffixHash: true
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/part-of: juiceshop-chatbot-observability
+    includeSelectors: false

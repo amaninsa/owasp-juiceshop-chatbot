@@ -1,5 +1,8 @@
 # OWASP Juice Shop Chatbot — .gitignore
 
+# Nested accidental clone / duplicate tree
+/owasp-juiceshop-chatbot/
+
 # Secrets & env (never commit)
 .env
 .env.*

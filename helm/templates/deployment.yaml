@@ -86,7 +86,8 @@ spec:
             capabilities:
               drop: ["ALL"]
             runAsNonRoot: true
-            readOnlyRootFilesystem: true
+            # App writes SQLite under data/ and restores ftp/legal.md at startup.
+            readOnlyRootFilesystem: false
       volumes:
         - name: tmp
           emptyDir: {}
@@ -213,7 +214,8 @@ spec:
             capabilities:
               drop: ["ALL"]
             runAsNonRoot: true
-            readOnlyRootFilesystem: true
+            # App writes SQLite under data/ and restores ftp/legal.md at startup.
+            readOnlyRootFilesystem: false
       volumes:
         - name: tmp
           emptyDir: {}

@@ -1,0 +1,9 @@
+# Delete cAdvisor on local KIND — privileged, disk/CPU heavy on Apple Silicon.
+# Container metrics remain available via kubelet /metrics/cadvisor scrape + node-exporter.
+# Production overlay keeps the DaemonSet from base.
+$patch: delete
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor
+  namespace: monitoring

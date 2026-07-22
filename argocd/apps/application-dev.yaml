@@ -1,24 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: juiceshop-chatbot-prod
+  name: juiceshop-chatbot-dev
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: juiceshop-chatbot
-    environment: prod
+    app.kubernetes.io/component: workload
+    environment: dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-  annotations:
-    notifications.argoproj.io/subscribe.on-sync-failed.slack: platform-alerts
 spec:
   project: juiceshop-chatbot
   source:
     repoURL: https://github.com/amaninsa/owasp-juiceshop-chatbot.git
-    targetRevision: main
-    path: apps/overlays/prod
+    targetRevision: develop
+    path: apps/overlays/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: juiceshop-chatbot
+    # Separate namespace for multi-env / EKS-ready isolation
+    namespace: juiceshop-chatbot-dev
   syncPolicy:
     automated:
       prune: true
@@ -28,11 +30,11 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
-      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:
-        duration: 10s
+        duration: 5s
         factor: 2
-        maxDuration: 5m
-  revisionHistoryLimit: 20
+        maxDuration: 3m
+  revisionHistoryLimit: 10

@@ -1,4 +1,5 @@
-# Bootstrap ArgoCD Applications + Project together
+# Bootstrap ArgoCD: AppProject + App-of-Apps root.
+# Child Applications live under argocd/apps/ and are synced by the root app.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -6,6 +7,4 @@ namespace: argocd
 
 resources:
   - project.yaml
-  - application-local.yaml
-  - application-dev.yaml
-  - application-prod.yaml
+  - root-application.yaml

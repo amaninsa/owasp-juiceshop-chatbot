@@ -1,0 +1,31 @@
+# Superseded by the enterprise pipeline split:
+#   ci.yml | cd.yml | security.yml | release.yml
+# Kept as a manual pointer so old bookmarks / badges can be updated.
+name: Platform CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Deprecated — use CI / CD / Security / Release workflows"
+        required: false
+        default: "redirect"
+
+permissions:
+  contents: read
+
+jobs:
+  redirect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Redirect
+        run: |
+          cat <<'EOF'
+          ============================================================
+           Platform CI/CD has been split into enterprise workflows:
+             • .github/workflows/ci.yml       — PR quality + GHCR SHA images
+             • .github/workflows/cd.yml       — main → Kustomize → Argo CD
+             • .github/workflows/security.yml — Gitleaks, Trivy, CodeQL, deps
+             • .github/workflows/release.yml  — tags v* → GHCR + GitHub Release
+          ============================================================
+          EOF

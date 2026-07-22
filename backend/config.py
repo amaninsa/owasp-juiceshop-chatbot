@@ -30,10 +30,6 @@ class Settings(BaseSettings):
     ingest_on_startup: bool = True
     chroma_wait_timeout_seconds: int = 120
 
-    # Observability
-    log_level: str = "INFO"
-    log_json: bool = True
-
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE) if ENV_FILE.exists() else None,
         env_file_encoding="utf-8",

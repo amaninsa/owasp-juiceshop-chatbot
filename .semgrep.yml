@@ -1,0 +1,7 @@
+# Semgrep rules for the AI platform (backend + K8s + frontend TS)
+rules: []
+
+# Prefer registry rulesets via CLI flags in CI:
+#   p/ci  p/security-audit  p/owasp-top-ten  p/python  p/typescript  p/kubernetes
+#
+# Local custom rules can be added under this file later without changing CI.

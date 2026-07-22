@@ -54,7 +54,7 @@ services:
       start_period: 90s
     restart: unless-stopped
 
-  juice-shop:
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
@@ -88,7 +88,7 @@ services:
     ports:
       - "${GATEWAY_PUBLISH_PORT:-3000}:80"
     depends_on:
-      juice-shop:
+      frontend:
         condition: service_healthy
       backend:
         condition: service_healthy

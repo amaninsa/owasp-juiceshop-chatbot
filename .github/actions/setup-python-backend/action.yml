@@ -1,0 +1,26 @@
+# Composite: Python 3.11 + pip cache + backend prod/dev deps
+name: Setup Python backend
+description: Install Python toolchain and backend requirements with pip caching
+inputs:
+  python-version:
+    description: Python version
+    required: false
+    default: "3.11"
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: |
+          backend/requirements.txt
+          backend/requirements-dev.txt
+
+    - name: Install backend dependencies
+      shell: bash
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -r requirements-dev.txt

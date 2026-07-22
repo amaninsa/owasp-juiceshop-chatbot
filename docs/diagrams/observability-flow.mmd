@@ -1,0 +1,8 @@
+flowchart LR
+  BE[Backend /metrics] --> PROM[Prometheus]
+  KSM[kube-state-metrics] --> PROM
+  NE[node-exporter] --> PROM
+  PT[Promtail] --> LOKI[Loki]
+  PROM --> GRAF[Grafana]
+  LOKI --> GRAF
+  PROM --> AM[Alertmanager]

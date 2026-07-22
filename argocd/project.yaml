@@ -8,15 +8,25 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  description: OWASP Juice Shop AI Assistant (frontend, backend, ChromaDB)
+  description: OWASP Juice Shop Chatbot — workloads + local observability
   sourceRepos:
-    # Replace with your real Git remote; "*" allowed for local bootstrap only.
+    - https://github.com/amaninsa/owasp-juiceshop-chatbot.git
+    # Allow forks during bootstrap; tighten in production.
     - "*"
   destinations:
     - namespace: juiceshop-chatbot
       server: https://kubernetes.default.svc
-    - namespace: "*"
+    - namespace: juiceshop-chatbot-dev
       server: https://kubernetes.default.svc
+    - namespace: juiceshop-chatbot-prod
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    # EKS migration: add additional cluster destinations here, e.g.
+    # - namespace: juiceshop-chatbot-prod
+    #   server: https://XXXXXXXX.yl4.region.eks.amazonaws.com
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -28,8 +38,12 @@ spec:
       kind: ClusterRoleBinding
     - group: networking.k8s.io
       kind: IngressClass
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
   orphanedResources:
     warn: true
+  # Production safety: require signed commits / allow only main for prod via sync windows if needed
+  syncWindows: []

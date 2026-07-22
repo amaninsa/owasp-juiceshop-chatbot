@@ -1,0 +1,40 @@
+# Composite: Node.js + npm cache for Juice Shop frontend/root
+name: Setup Node frontend
+description: Install Node.js and npm dependencies (ci when lockfile exists)
+inputs:
+  node-version:
+    description: Node.js version
+    required: false
+    default: "24"
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        # Cache keyed on package.json when lockfiles are absent
+        cache: npm
+        cache-dependency-path: |
+          package.json
+          frontend/package.json
+
+    - name: Install root + frontend dependencies
+      shell: bash
+      env:
+        NODE_OPTIONS: --max_old_space_size=4096
+      run: |
+        set -euo pipefail
+        # Prefer npm ci (enterprise); fall back when lockfiles are not yet committed.
+        if [[ -f package-lock.json ]]; then
+          npm ci --ignore-scripts
+        else
+          echo "::notice::No package-lock.json — using npm install (commit lockfiles for reproducible CI)"
+          npm install --ignore-scripts
+        fi
+        npm rebuild sqlite3 || true
+        if [[ -f frontend/package-lock.json ]]; then
+          (cd frontend && npm ci --ignore-scripts)
+        else
+          (cd frontend && npm install --ignore-scripts)
+        fi

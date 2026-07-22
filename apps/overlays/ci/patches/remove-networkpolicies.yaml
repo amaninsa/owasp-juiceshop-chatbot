@@ -1,37 +1,44 @@
 # CI: drop NetworkPolicies so KIND port-forward smoke tests are reliable.
 # Local/dev/prod keep the full policy set from base.
+# Namespace must match the overlay `namespace:` field for $patch:delete to resolve.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-default-deny
+  namespace: juiceshop-chatbot
 $patch: delete
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-allow-dns
+  namespace: juiceshop-chatbot
 $patch: delete
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-allow-ingress-nginx
+  namespace: juiceshop-chatbot
 $patch: delete
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-allow-backend
+  namespace: juiceshop-chatbot
 $patch: delete
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-allow-chromadb
+  namespace: juiceshop-chatbot
 $patch: delete
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: juiceshop-chatbot-allow-frontend
+  namespace: juiceshop-chatbot
 $patch: delete

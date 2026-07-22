@@ -1,4 +1,5 @@
 # KIND cluster for Juice Shop AI Assistant (local production-like environment)
+# Tuned for Apple Silicon (Docker Desktop / Colima / OrbStack) — not HA.
 # Docs: https://kind.sigs.k8s.io/docs/user/configuration/
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -6,6 +7,7 @@ name: juiceshop-chatbot
 networking:
   apiServerAddress: "127.0.0.1"
   apiServerPort: 6443
+  # Disable default CNI swap-heavy features; kindnet is fine for single-node demos.
 nodes:
   # Single-node keeps hostPath Chroma PV simple and reliable for local demos.
   - role: control-plane
@@ -15,6 +17,20 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
+            # Evict earlier so pods restart instead of filling the KIND disk.
+            eviction-hard: "imagefs.available<10%,nodefs.available<10%,memory.available<100Mi"
+            eviction-soft: "imagefs.available<15%,nodefs.available<15%"
+            eviction-soft-grace-period: "imagefs.available=1m30s,nodefs.available=1m30s"
+            # Reclaim unused images sooner (helps Apple Silicon Docker disk pressure).
+            image-gc-high-threshold: "70"
+            image-gc-low-threshold: "50"
+            # Prefer containerd image GC behaviour suitable for demos.
+            serialize-image-pulls: "false"
+      - |
+        kind: KubeletConfiguration
+        # Keep ephemeral storage accounting accurate inside the KIND node.
+        evictionMaxPodGracePeriod: 30
+        maxPods: 110
     extraPortMappings:
       - containerPort: 80
         hostPort: 8080

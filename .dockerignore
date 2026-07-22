@@ -46,6 +46,12 @@ ftp/legal.md
 .env.*
 !.env.example
 
-# Nested compose / local docker state
-**/docker-compose*.yml
-Dockerfile
+# Nested accidental clones / GitOps trees (not needed inside app images)
+owasp-juiceshop-chatbot/
+apps/
+argocd/
+helm/
+k8s/
+scripts/
+docs/
+data/kind/

@@ -1,0 +1,24 @@
+# Legacy upstream OWASP Juice Shop CI/CD Pipeline.
+# Superseded by ci.yml / cd.yml / security.yml / release.yml for this fork.
+# Kept for manual compatibility runs only.
+name: "CI/CD Pipeline (Juice Shop legacy)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why run legacy Juice Shop CI?"
+        required: false
+        default: "compat"
+
+# NOTE: Original job definitions preserved below for reference / rare upstream parity.
+# Automatic push/PR triggers were removed to avoid duplicate pipelines.
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use enterprise pipelines
+        run: |
+          echo "::notice::Use workflows: ci.yml, cd.yml, security.yml, release.yml"
+          echo "This legacy workflow is dispatch-only and does not run the full Juice Shop matrix."

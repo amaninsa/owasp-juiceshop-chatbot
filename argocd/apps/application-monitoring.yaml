@@ -1,22 +1,28 @@
+# Optional observability stack (Prometheus/Grafana/Loki) for KIND / shared clusters.
+# Disable by removing from argocd/apps/kustomization.yaml when targeting managed EKS
+# with a central observability platform (AMP/AMG, Datadog, etc.).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: juiceshop-chatbot-dev
+  name: juiceshop-chatbot-monitoring
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: juiceshop-chatbot
-    environment: dev
+    app.kubernetes.io/component: observability
+    environment: shared
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: juiceshop-chatbot
   source:
     repoURL: https://github.com/amaninsa/owasp-juiceshop-chatbot.git
-    targetRevision: develop
-    path: apps/overlays/dev
+    targetRevision: HEAD
+    path: k8s/monitoring/local
   destination:
     server: https://kubernetes.default.svc
-    namespace: juiceshop-chatbot
+    namespace: monitoring
   syncPolicy:
     automated:
       prune: true
@@ -26,10 +32,11 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:
         duration: 5s
         factor: 2
         maxDuration: 3m
-  revisionHistoryLimit: 10
+  revisionHistoryLimit: 5

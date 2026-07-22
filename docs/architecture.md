@@ -1,203 +1,188 @@
-# Architecture diagrams
+# Architecture — Juice Shop AI Cloud Native Platform
 
-Mermaid diagrams for the Juice Shop AI platform. Rendered in GitHub, most IDEs, and [mermaid.live](https://mermaid.live).
-
-Also summarized in [`AI-PLATFORM.md`](../AI-PLATFORM.md).
+Production-inspired platform architecture for a RAG chatbot on Kubernetes.
+Diagrams are Mermaid (GitHub-native). Export PNG from [mermaid.live](https://mermaid.live) or the sources under [`docs/diagrams/`](./diagrams/).
 
 ---
 
-## 1. Overall architecture
-
-End-to-end request and data flow across client, edge, workloads, and OpenAI.
+## 1. End-to-end platform (CI → GitOps → runtime → observability)
 
 ```mermaid
 flowchart TB
-  subgraph Users
-    B[Browser / AI Chat Widget]
-  end
+  DEV[Developer] --> GH[GitHub Repository]
+  GH --> GHA[GitHub Actions<br/>Platform CI/CD]
+  GHA --> BUILD[Docker Build<br/>+ Trivy / Syft / Cosign]
+  BUILD --> GHCR[GitHub Container Registry]
+  GHCR --> ARGO[Argo CD<br/>App of Apps]
+  ARGO --> K8S[Kubernetes / KIND]
 
-  subgraph Edge["Edge"]
-    I[Ingress / nginx Gateway]
-  end
-
-  subgraph Platform["juiceshop-chatbot namespace"]
-    FE[Frontend<br/>OWASP Juice Shop]
+  subgraph Runtime["Namespace: juiceshop-chatbot"]
+    FE[Frontend<br/>Angular Juice Shop]
     BE[Backend<br/>FastAPI RAG]
-    CH[(ChromaDB<br/>product embeddings)]
+    CH[(ChromaDB)]
   end
 
-  subgraph External["External"]
-    OAI[OpenAI<br/>embeddings + chat]
+  K8S --> FE
+  K8S --> BE
+  K8S --> CH
+  BE --> CH
+  BE --> OAI[OpenAI API]
+
+  subgraph Obs["Namespace: monitoring"]
+    PROM[Prometheus]
+    GRAF[Grafana]
+    LOKI[Loki]
+    AM[Alertmanager]
   end
 
-  B -->|"HTTP"| I
-  I -->|"/ "| FE
-  I -->|"/ai-assistant/*"| BE
-  B -.->|"same-origin chat"| I
-  BE -->|"retrieve top-K"| CH
-  BE -->|"embed + complete"| OAI
-  BE -.->|"ingest products"| CH
+  BE -->|/metrics| PROM
+  PROM --> GRAF
+  PROM --> AM
+  LOKI --> GRAF
 ```
+
+Source: [`diagrams/platform-overview.mmd`](./diagrams/platform-overview.mmd)
 
 ---
 
-## 2. Kubernetes architecture
-
-Workloads, storage, config, and traffic inside the cluster (KIND / cloud).
-
-```mermaid
-flowchart TB
-  subgraph Cluster["Kubernetes cluster"]
-    subgraph IngressNS["ingress-nginx"]
-      IC[Ingress Controller]
-    end
-
-    subgraph NS["namespace: juiceshop-chatbot"]
-      ING[Ingress rules<br/>juiceshop-chatbot.local]
-      SVC_FE[Service frontend :3000]
-      SVC_BE[Service backend :8000]
-      SVC_CH[Service chromadb :8000]
-
-      DEP_FE[Deployment frontend]
-      DEP_BE[Deployment backend]
-      DEP_CH[Deployment chromadb]
-
-      CM[ConfigMap<br/>juiceshop-chatbot-config]
-      SEC[Secret<br/>juiceshop-chatbot-secrets]
-      PVC[PVC + PV<br/>Chroma data]
-      NP[NetworkPolicies]
-      SA[ServiceAccounts + RBAC]
-    end
-  end
-
-  IC --> ING
-  ING --> SVC_FE --> DEP_FE
-  ING --> SVC_BE --> DEP_BE
-  DEP_BE --> SVC_CH --> DEP_CH
-  DEP_CH --> PVC
-  DEP_BE --> CM
-  DEP_BE --> SEC
-  DEP_FE --> CM
-  NP -.-> DEP_FE & DEP_BE & DEP_CH
-  SA -.-> DEP_FE & DEP_BE & DEP_CH
-```
-
----
-
-## 3. GitHub Actions flow
-
-CI/CD pipeline for the AI platform (`.github/workflows/ai-platform-ci.yml`).
+## 2. Request path (user → AI)
 
 ```mermaid
 flowchart LR
-  subgraph Trigger
-    T1[push develop/main]
-    T2[pull_request]
-    T3[workflow_dispatch]
-  end
-
-  subgraph Quality
-    Q1[Ruff lint/format]
-    Q2[Pytest]
-    Q3[ESLint widget]
-    Q4[Helm + Kustomize]
-  end
-
-  subgraph Supply
-    B[Build images]
-    S[Trivy scan]
-    P[Push GHCR<br/>latest / sha / semver]
-  end
-
-  subgraph Deploy
-    K[KIND smoke<br/>apps/overlays/ci]
-    G[Commit GitOps tags<br/>ArgoCD path]
-  end
-
-  T1 & T2 & T3 --> Q1 & Q2 & Q3 & Q4
-  Q1 & Q2 & Q3 & Q4 --> B
-  B --> S --> P
-  P --> K
-  P --> G
+  U[Browser + AI Widget] --> ING[ingress-nginx :8080]
+  ING -->|"/"| FE[Frontend]
+  ING -->|"/ai-assistant/*"| BE[FastAPI]
+  BE --> CH[(ChromaDB)]
+  BE --> OAI[OpenAI]
 ```
 
 ---
 
-## 4. GitOps flow
+## 3. Kubernetes layout
 
-Desired state in Git; ArgoCD reconciles the cluster.
+```mermaid
+flowchart TB
+  subgraph Cluster["KIND cluster: juiceshop-chatbot"]
+    subgraph IngressNS["ingress-nginx"]
+      IC[Ingress Controller]
+    end
+    subgraph AppNS["juiceshop-chatbot"]
+      FE[frontend]
+      BE[backend]
+      CH[chromadb]
+    end
+    subgraph MonNS["monitoring"]
+      P[prometheus]
+      G[grafana]
+      L[loki]
+      A[alertmanager]
+    end
+    subgraph ArgoNS["argocd"]
+      AS[argocd-server]
+      RS[repo-server]
+    end
+  end
+  IC --> AppNS
+  IC --> MonNS
+  IC --> ArgoNS
+```
+
+---
+
+## 4. GitHub Actions → GHCR → Argo CD
+
+```mermaid
+flowchart LR
+  PR[PR / push] --> SEC[DevSecOps gates]
+  SEC --> QT[Lint + Tests]
+  QT --> KQ[kubeconform]
+  KQ --> IMG[Build images]
+  IMG --> SCAN[Trivy + Syft + Cosign]
+  SCAN --> REG[Push GHCR]
+  REG --> TAG[GitOps tag commit]
+  TAG --> SYNC[Argo CD auto-sync]
+  SYNC --> ROLL[Kubernetes rollout]
+```
+
+Details: [`github-actions.md`](./github-actions.md) · [`cicd.md`](./cicd.md)
+
+---
+
+## 5. GitOps (App of Apps)
 
 ```mermaid
 sequenceDiagram
   participant Dev as Developer
   participant GH as GitHub
-  participant CI as GitHub Actions
-  participant Argo as ArgoCD
+  participant CI as Platform CI
+  participant Root as Argo CD Root
+  participant App as Child Application
   participant K8s as Cluster
 
-  Dev->>GH: Merge to develop/main
-  GH->>CI: ai-platform-ci.yml
-  CI->>CI: Build / scan / push GHCR
-  CI->>GH: Commit image tags<br/>apps/overlays/dev|prod
-  Argo->>GH: Detect drift (poll/webhook)
-  Argo->>K8s: Sync Application<br/>prune + selfHeal
-  K8s->>K8s: Rollout new pods
-  Note over Argo,K8s: Manual drift is reverted by selfHeal
+  Dev->>GH: Merge
+  GH->>CI: platform-ci.yml
+  CI->>REG: Push signed images
+  CI->>GH: Update overlay image tags
+  Root->>GH: Watch argocd/apps
+  Root->>App: Ensure Application CR
+  App->>GH: Detect desired state
+  App->>K8s: Sync (prune + selfHeal)
 ```
 
-**Overlays**
-
-| Path | Audience |
-|------|----------|
-| `apps/overlays/local` | KIND laptop |
-| `apps/overlays/dev` | Shared/dev cluster |
-| `apps/overlays/prod` | Production |
-| `apps/overlays/ci` | Ephemeral CI KIND |
+Details: [`argocd.md`](./argocd.md) · [`gitops.md`](./gitops.md)
 
 ---
 
-## 5. RAG flow
-
-Product Q&A: retrieve relevant Juice Shop products, then generate an answer.
+## 6. RAG sequence
 
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant W as Chat Widget
-  participant API as FastAPI /chat
-  participant R as ProductRetriever
+  participant API as FastAPI
   participant C as ChromaDB
   participant O as OpenAI
-
-  U->>W: Ask about a product / price
-  W->>API: POST /chat {message, history}
-  API->>R: retrieve(query)
-  R->>O: embed query
-  O-->>R: query vector
-  R->>C: similarity search top-K
-  C-->>R: product documents + metadata
-  R-->>API: formatted context
-  API->>O: chat completion<br/>system + context + history
-  O-->>API: reply
-  API-->>W: {reply, correlation_id}
-  W-->>U: Render answer
-
-  Note over API,C: Startup / POST /ingest embeds<br/>config/default.yml products into Chroma
-```
-
-**Ingest (offline / startup)**
-
-```mermaid
-flowchart LR
-  Y[config/default.yml] --> P[products.py]
-  P --> E[OpenAI embeddings]
-  E --> U[Upsert Chroma collection<br/>juice_shop_products]
+  U->>API: POST /chat
+  API->>O: Embed query
+  API->>C: Similarity search
+  C-->>API: Product context
+  API->>O: Chat completion
+  O-->>API: Grounded reply
+  API-->>U: Answer + correlation_id
 ```
 
 ---
 
-## How to edit
+## 7. Observability data flow
 
-1. Change the Mermaid source in this file.
-2. Preview on GitHub or paste into [mermaid.live](https://mermaid.live).
-3. Keep diagrams aligned with `apps/base`, `backend/`, and `AI-PLATFORM.md`.
+```mermaid
+flowchart LR
+  BE[Backend /metrics] --> PROM[Prometheus]
+  KSM[kube-state-metrics] --> PROM
+  NE[node-exporter] --> PROM
+  PT[Promtail] --> LOKI[Loki]
+  PROM --> GRAF[Grafana]
+  LOKI --> GRAF
+  PROM --> AM[Alertmanager]
+```
+
+Local profile notes: emptyDir + 24h retention; **cAdvisor DaemonSet disabled** (see [`monitoring.md`](./monitoring.md)).
+
+---
+
+## Overlays / namespaces
+
+| Path | Namespace | Audience |
+|------|-----------|----------|
+| `apps/overlays/local` | `juiceshop-chatbot` | KIND laptop |
+| `apps/overlays/dev` | `juiceshop-chatbot-dev` | Shared / staging |
+| `apps/overlays/prod` | `juiceshop-chatbot-prod` | Production-style |
+| `k8s/monitoring/local` | `monitoring` | KIND observability |
+| `k8s/monitoring/production` | `monitoring` | PVC + longer retention |
+
+---
+
+## Export PNG
+
+1. Open [`diagrams/platform-overview.mmd`](./diagrams/platform-overview.mmd) in [mermaid.live](https://mermaid.live).
+2. **Actions → PNG / SVG**.
+3. Save under `docs/screenshots/` for LinkedIn (see [`screenshots.md`](./screenshots.md)).

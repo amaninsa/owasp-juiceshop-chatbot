@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update image tags in Kustomize overlays + Helm values after a successful CI build.
+# Update image tags (and registry owner) in Kustomize overlays + Helm values after CI.
 # Usage: OWNER=myorg ./scripts/update-image-tags.sh <sha> [version]
 set -euo pipefail
 
@@ -10,16 +10,18 @@ REGISTRY="${REGISTRY:-ghcr.io}"
 OWNER="${OWNER:-${GITHUB_REPOSITORY_OWNER:-amaninsa}}"
 OWNER="${OWNER,,}"
 
-update_kustomize_tags() {
+update_kustomize() {
   local file="$1"
   local tag="$2"
-  python3 - "$file" "$tag" <<'PY'
+  python3 - "$file" "$tag" "$REGISTRY" "$OWNER" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 path = Path(sys.argv[1])
 tag = sys.argv[2]
+registry = sys.argv[3]
+owner = sys.argv[4]
 if not path.exists():
     raise SystemExit(0)
 
@@ -33,9 +35,16 @@ out = []
 pending = None
 for line in lines:
     m = re.search(r"newName:\s*.*/(owasp-juiceshop-chatbot-[a-z0-9-]+)$", line)
+    m2 = re.search(r"newName:\s*(owasp-juiceshop-chatbot-[a-z0-9-]+)$", line)
     if m and m.group(1) in known:
-        pending = m.group(1)
-        out.append(line)
+        name = m.group(1)
+        pending = name
+        out.append(f"    newName: {registry}/{owner}/{name}")
+        continue
+    if m2 and m2.group(1) in known:
+        name = m2.group(1)
+        pending = name
+        out.append(f"    newName: {registry}/{owner}/{name}")
         continue
     if pending and "newTag:" in line:
         quote = '"' if '"' in line else ""
@@ -45,40 +54,51 @@ for line in lines:
     out.append(line)
 
 path.write_text("\n".join(out) + "\n")
-print(f"Updated {path} -> {tag}")
+print(f"Updated {path} -> {registry}/{owner} tag={tag}")
 PY
 }
 
 update_helm_tags() {
   local file="$1"
   local tag="$2"
-  python3 - "$file" "$tag" <<'PY'
+  python3 - "$file" "$tag" "$OWNER" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 path = Path(sys.argv[1])
 tag = sys.argv[2]
+owner = sys.argv[3]
 if not path.exists():
     raise SystemExit(0)
 
 text = path.read_text()
-# Replace tag under image: blocks for our three services
+text = re.sub(
+    r"(repository:\s*)(?:ghcr\.io/)?[^\s/]+/(owasp-juiceshop-chatbot-(?:frontend|backend|chromadb))",
+    rf"\1ghcr.io/{owner}/\2",
+    text,
+)
 text = re.sub(
     r"(repository:\s*owasp-juiceshop-chatbot-(?:frontend|backend|chromadb)\s*\n\s*tag:\s*)[^\n]+",
     rf'\1"{tag}"',
     text,
 )
+text = re.sub(
+    r"(repository:\s*ghcr\.io/" + re.escape(owner) + r"/owasp-juiceshop-chatbot-(?:frontend|backend|chromadb)\s*\n\s*tag:\s*)[^\n]+",
+    rf'\1"{tag}"',
+    text,
+)
 path.write_text(text)
-print(f"Updated {path} -> {tag}")
+print(f"Updated {path} -> tag={tag}")
 PY
 }
 
-update_kustomize_tags "${ROOT_DIR}/apps/overlays/dev/kustomization.yaml" "${SHA}"
+# Dev tracks short SHA (and CI also publishes :dev on develop)
+update_kustomize "${ROOT_DIR}/apps/overlays/dev/kustomization.yaml" "${SHA}"
 update_helm_tags "${ROOT_DIR}/helm/values-dev.yaml" "${SHA}"
 
 if [[ -n "${VERSION}" ]]; then
-  update_kustomize_tags "${ROOT_DIR}/apps/overlays/prod/kustomization.yaml" "${VERSION}"
+  update_kustomize "${ROOT_DIR}/apps/overlays/prod/kustomization.yaml" "${VERSION}"
   update_helm_tags "${ROOT_DIR}/helm/values.yaml" "${VERSION}"
 fi
 
