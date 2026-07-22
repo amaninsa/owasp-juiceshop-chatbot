@@ -1,4 +1,4 @@
-# Juice Shop AI — local KIND / Docker orchestration
+# Juice Shop AI — local KIND / Docker orchestration (enterprise GitOps CI/CD)
 # Usage: make help
 
 SHELL := /bin/bash
