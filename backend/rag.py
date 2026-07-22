@@ -29,7 +29,8 @@ class OpenAIEmbedder:
 def get_chroma_client(
     host: str | None = None,
     port: int | None = None,
-) -> chromadb.HttpClient:
+) -> Any:
+    """Return a ChromaDB HTTP client (typed as Any — chromadb stubs are incomplete)."""
     settings = get_settings()
     return chromadb.HttpClient(
         host=host or settings.chroma_host,
@@ -38,7 +39,7 @@ def get_chroma_client(
 
 
 def get_or_create_collection(
-    client: chromadb.HttpClient | None = None,
+    client: Any | None = None,
     name: str | None = None,
 ) -> Collection:
     settings = get_settings()
@@ -62,9 +63,9 @@ class ProductRetriever:
         k = top_k or self.top_k
         query_embedding = self.embedder.embed_query(query)
         results = self.collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[query_embedding],  # type: ignore[arg-type]
             n_results=k,
-            include=["documents", "metadatas", "distances"],
+            include=["documents", "metadatas", "distances"],  # type: ignore[list-item]
         )
 
         documents = (results.get("documents") or [[]])[0]

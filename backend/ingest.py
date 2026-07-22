@@ -55,7 +55,7 @@ def ingest(reset: bool = False) -> int:
             ids=ids[start:end],
             documents=documents[start:end],
             metadatas=metadatas[start:end],
-            embeddings=embeddings[start:end],
+            embeddings=embeddings[start:end],  # type: ignore[arg-type]
         )
         print(f"  upserted {min(end, len(ids))}/{len(ids)}")
 

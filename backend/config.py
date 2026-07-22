@@ -12,7 +12,8 @@ if ENV_FILE.exists():
 
 
 class Settings(BaseSettings):
-    open_ai_key: str
+    # Populated from OPEN_AI_KEY / .env.openai at runtime (empty default for type-checkers).
+    open_ai_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     products_config_path: Path = ROOT_DIR / "config" / "default.yml"

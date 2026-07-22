@@ -51,7 +51,7 @@ class ProductAssistant:
 
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
             temperature=0.2,
         )
         content = response.choices[0].message.content

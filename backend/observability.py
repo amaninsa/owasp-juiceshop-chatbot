@@ -92,7 +92,7 @@ def setup_logging(*, level: str = "INFO", json_logs: bool = True) -> None:
         # Inject correlation_id into every record for text format
         old_factory = logging.getLogRecordFactory()
 
-        def record_factory(*args, **kwargs):  # type: ignore[no-untyped-def]
+        def record_factory(*args: object, **kwargs: object) -> logging.LogRecord:
             record = old_factory(*args, **kwargs)
             record.correlation_id = correlation_id_var.get()  # type: ignore[attr-defined]
             return record
