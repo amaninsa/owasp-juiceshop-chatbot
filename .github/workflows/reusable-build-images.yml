@@ -57,10 +57,14 @@ jobs:
             context: .
             file: Dockerfile
             repo: frontend
+            # Juice Shop intentionally ships vulnerable Node libraries for training.
+            # Fail closed on OS CRITICAL; library findings are covered by Security FS reporting.
+            trivy_vuln_type: os
           - name: backend
             context: .
             file: backend/Dockerfile
             repo: backend
+            trivy_vuln_type: os,library
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -97,6 +101,7 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/${{ matrix.repo }}
           tags: ${{ steps.tags.outputs.list }}
           push: ${{ inputs.push && 'true' || 'false' }}
+          trivy-vuln-type: ${{ matrix.trivy_vuln_type }}
 
   summary:
     name: Image refs

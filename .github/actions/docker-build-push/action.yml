@@ -21,8 +21,12 @@ inputs:
   trivy-severity:
     description: Severities that fail the gate
     required: false
-    # CRITICAL only: Juice Shop / Node base images commonly ship HIGH CVEs
     default: "CRITICAL"
+  trivy-vuln-type:
+    description: Trivy vuln-type (os and/or library)
+    required: false
+    # Backend: os+library. Frontend Juice Shop: os only (intentional vulnerable npm deps).
+    default: "os,library"
 runs:
   using: composite
   steps:
@@ -63,10 +67,9 @@ runs:
         exit-code: "1"
         severity: ${{ inputs.trivy-severity }}
         ignore-unfixed: true
-        # Prefer fixing CVEs in Dockerfiles; keep ignore file empty unless documented.
-        trivyignores: .trivyignore
-        vuln-type: os,library
+        vuln-type: ${{ inputs.trivy-vuln-type }}
         scanners: vuln
+        trivyignores: .trivyignore
 
     - name: Push tags to GHCR
       if: inputs.push == 'true'
